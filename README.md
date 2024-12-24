@@ -1,7 +1,3 @@
-```
-                                      BIOSUR
-```
-```
            *                *          *            *        *                  *      
           / /\             /\ \       /\ \         / /\     /\_\               /\ \    
          / /  \            \ \ \     /  \ \       / /  \   / / /         *    /  \ \   
@@ -13,9 +9,8 @@
    / / /____\_\ \  ___/ / /__  / / /___/ / //_/\__/ / /    / / /___/ / // / /\ \ \     
   / / /__________\/\__\/_/___\/ / /____\/ / \ \/___/ /    / / /____\/ // / /  \ \ \    
   \/_____________/\/_________/\/_________/   \_____\/     \/_________/ \/_/    \_\/     
-```
 
-The purpose of this repo is to automatize and refactor the  CRECK characterization method for biomass.
+The purpose of this repo is to automatize and refactor the  CRECK characterization method for biomasses.
 
 The codes takes as input the elemental composition of a biomass sample in terms of Carbon (C) and Hydrogen (H) in Dry Ash Free (D.A.F) basis wt (-). Oxygen (O) content is calculated by difference, such that C + O + H = 1. 
 

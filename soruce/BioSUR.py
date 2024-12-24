@@ -1,6 +1,14 @@
 from dataclasses import dataclass, field
 import numpy as np
 from typing import List, Optional
+from enum import IntEnum
+
+class BiomassType(IntEnum):
+    OTHERS = 0
+    GRASS = 1
+    HARDWOOD = 2
+    SOFTWOOD = 3
+
 
 @dataclass
 class BioSUR:
@@ -27,16 +35,32 @@ class BioSUR:
     ])[0])
 
     # Splitting parameters
-    splitting_parameters: np.ndarray = field(default_factory=lambda: np.array([]))
+    splitting_parameters: np.ndarray = field(default_factory=lambda: np.zeros((1, 5)))
 
     # Optimization parameters
-    optimization_parameters: np.ndarray = field(default_factory=lambda: np.array([]))
+    optimization_parameters: np.ndarray = field(default_factory=lambda: np.array([
+        # i = 0: Overall 
+        [[-0.586, 0.995, 1.015, 0.294, 0.734],
+        [2.255, -0.012, -0.045, 0.986, -0.372],
+        [0, 0.162, 0.005, 0.002, -0.021]],
+
+        # i = 1: Grass
+        [[0.626, 0.155, 6.944, -2.249, -3.501],
+        [0.877, -2.11, -13.983, 0.731, 3.038],
+        [-8.681, 29.643, 13.707, 33.856, 45.092]],
+
+        # i = 2: Wood
+        [[1.503, 2.079, 12.697, -1.75, -2.339],
+        [-0.037, -2.16, -25.284, 3.428, 1.303],
+        [-13.807, -0.207, 12.461, 13.422, 41.335]]
+    ]))
+
     optimization_index: int = field(default=0)
 
     # Biomass type
     # 0: Others, 1: Grass, 2: Hardwood, 3: Softwood
-    biomass_type: int = field(default=0)
-    
+    biomass_type: BiomassType = field(default=BiomassType.OTHERS)
+
     def __post_init__(self):
         """Initialize default values after dataclass initialization"""
         pass
@@ -89,7 +113,23 @@ class BioSUR:
             'output': {name: self.output_composition[name] for name in self.output_composition.dtype.names}
         }
     
-    def set_biomass_type(self, biomass_type: int) -> 'BioSUR':
-        """Set biomass type"""
-        self.biomass_type = biomass_type
+    def set_optimization_index(self) -> 'BioSUR':
+        """Set optimization index to 0, 1, or 2"""
+        self.optimization_index = 2 if self.biomass_type >= 2 else self.biomass_type # catch 2: Hardwood, 3: Softwood
         return self
+    
+    def set_biomass_type(self, biomass_type: BiomassType) -> 'BioSUR':
+        """Set biomass type to one of: OTHERS(0), GRASS(1), HARDWOOD(2), SOFTWOOD(3)"""
+        self.biomass_type = biomass_type
+        self.set_optimization_index()
+        return self
+    
+    def calculate_splitting_parameters(self) -> 'BioSUR':
+        """Calculate splitting parameters"""
+
+        multiplier_array = np.array([1, self.input_composition["C"], self.input_composition["H"]])
+        multiplier_matrix = np.tile(multiplier_array, (5, 1)).T
+
+        self.splitting_parameters = np.sum(self.optimization_parameters[self.optimization_index]
+                                           * multiplier_matrix, axis=0)
+        return self 
