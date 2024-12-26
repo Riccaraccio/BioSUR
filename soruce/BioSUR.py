@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 import numpy as np
 from typing import List, Optional
 from enum import IntEnum
+from species import ReferenceSpecies
+from species import ReferenceMixture
 
 class BiomassType(IntEnum):
     OTHERS = 0
@@ -60,6 +62,11 @@ class BioSUR:
     # Biomass type
     # 0: Others, 1: Grass, 2: Hardwood, 3: Softwood
     biomass_type: BiomassType = field(default=BiomassType.OTHERS)
+
+    # Reference mixtures
+    RM1: ReferenceMixture = field(default_factory=ReferenceMixture)
+    RM2: ReferenceMixture = field(default_factory=ReferenceMixture)
+    RM3: ReferenceMixture = field(default_factory=ReferenceMixture)
 
     def __post_init__(self):
         """Initialize default values after dataclass initialization"""
@@ -131,5 +138,49 @@ class BioSUR:
         multiplier_matrix = np.tile(multiplier_array, (5, 1)).T
 
         self.splitting_parameters = np.sum(self.optimization_parameters[self.optimization_index]
-                                           * multiplier_matrix, axis=0)
+                                           * multiplier_matrix, axis=0).clip(0, 1)
+
         return self 
+    
+    def calculate_ratio_ref_species(self) -> 'BioSUR':
+        """Calculate ratio of reference species"""
+        ratios = np.zeros(7)
+
+        #splitting_paramteress = [alpha, beta, gamma, delta, epsilon]
+        alpha = self.splitting_parameters[0]
+        beta = self.splitting_parameters[1]
+        gamma = self.splitting_parameters[2]
+        delta = self.splitting_parameters[3]
+        epsilon = self.splitting_parameters[4]
+
+        # For RM1:
+        self.RM1.mix_species({
+            'CELL': alpha,
+            'HCELL': 1-alpha
+        })
+
+        # For RM2:
+        self.RM2.mix_species({
+            'LIGH': delta*beta,
+            'LIGC': delta*(1-beta),
+            'TGL': 1 - delta*beta - delta*(1-beta)
+        })
+
+        # For RM3:
+        self.RM3.mix_species({
+            'LIGO': epsilon*gamma,
+            'LIGC': epsilon*(1-gamma),
+            'TANN': 1 - epsilon*gamma - epsilon*(1-gamma)
+        })
+
+        return self
+
+
+
+
+    def calculate_output_composition(self) -> 'BioSUR':
+        """Calculate output composition"""
+        self.calculate_splitting_parameters()
+        #TODO 
+
+        return self
