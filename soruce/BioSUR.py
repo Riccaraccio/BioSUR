@@ -5,13 +5,13 @@ from enum import IntEnum
 from species import ReferenceSpecies
 from species import ReferenceMixture
 import math
+import warnings
 
 class BiomassType(IntEnum):
     OTHERS = 0
     GRASS = 1
     HARDWOOD = 2
     SOFTWOOD = 3
-
 
 @dataclass
 class BioSUR:
@@ -80,10 +80,6 @@ class BioSUR:
         self.input_composition['O'] = 1.0 - C - H
         self.input_composition['ASH'] = ASH
         self.input_composition['MOIST'] = MOIST
-        
-        # Copy ASH and MOIST to output composition
-        self.output_composition['ASH'] = ASH
-        self.output_composition['MOIST'] = MOIST
         return self
 
     @classmethod
@@ -197,13 +193,14 @@ class BioSUR:
         if not math.isclose(np.sum(x), 1):
             raise ValueError("Solution of the linear sistem failed: sum of fractions is not 1")
         
-        self.RM1.fraction = x[0]
-        self.RM2.fraction = x[1]
-        self.RM3.fraction = x[2]
+        if np.any(x < 0):
+            warnings.warn("Solution of the linear system failed: the biomass sample falls outside the triangle defined by the reference mixtures")
+        
+        # Convert to mole fractions
+        self.RM1.fraction = x[0] / self.RM1.MW / (x[0]/self.RM1.MW + x[1]/self.RM2.MW + x[2]/self.RM3.MW)
+        self.RM2.fraction = x[1] / self.RM2.MW / (x[0]/self.RM1.MW + x[1]/self.RM2.MW + x[2]/self.RM3.MW)
+        self.RM3.fraction = x[2] / self.RM3.MW / (x[0]/self.RM1.MW + x[1]/self.RM2.MW + x[2]/self.RM3.MW)
         return self
-
-
-
 
     def calculate_output_composition(self) -> 'BioSUR':
         """Calculate output composition"""
@@ -211,6 +208,22 @@ class BioSUR:
         self.calculate_ratio_ref_species()
         self.solve_linear_system()
 
-        #TODO 
+        out_comp = {"CELL": 0, "HCELL": 0, "LIGO": 0, "LIGH": 0, "LIGC": 0, "TANN": 0, "TGL": 0}
+        for species in out_comp.keys():
+            if species in self.RM1.composition:
+                out_comp[species] += self.RM1.composition[species] * self.RM1.fraction
+            if species in self.RM2.composition:
+                out_comp[species] += self.RM2.composition[species] * self.RM2.fraction
+            if species in self.RM3.composition:
+                out_comp[species] += self.RM3.composition[species] * self.RM3.fraction
 
+        ref_species = ReferenceSpecies()
+        avg_MW = np.sum([value * ref_species[key]['MW'] for key, value in out_comp.items()])
+
+        out_comp = {key: value * ref_species[key]['MW'] / avg_MW for key, value in out_comp.items()}
+        
+        self.output_composition = {key: out_comp[key] * (1 - self.input_composition["ASH"] - self.input_composition["MOIST"])
+                                   if key not in ["ASH", "MOIST"] else self.input_composition[key]
+                                   for key in self.output_composition.dtype.names}
+        
         return self

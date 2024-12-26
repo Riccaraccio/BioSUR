@@ -55,14 +55,14 @@ class ReferenceMixture:
     def calculate_fractions(self) -> None:
         self.calculate_molecular_weight()
         if self.MW != 0:
-            self.C_frac = self.C * 12.01 / self.MW
-            self.H_frac = self.H * 1.008 / self.MW
-            self.O_frac = self.O * 15.999/ self.MW
+            self.C_frac = self.C * 12 / self.MW # Using 12 as in the excel file
+            self.H_frac = self.H * 1 / self.MW
+            self.O_frac = self.O * 16/ self.MW
 
     def calculate_molecular_weight(self) -> float:
-        self.MW = (self.C * 12.01 + 
-                  self.H * 1.008 + 
-                  self.O * 15.999)
+        self.MW = (self.C * 12 + 
+                  self.H * 1 + 
+                  self.O * 16)
         return self.MW
 
     def mix_species(self, species_weights: Dict[str, float]) -> None:
