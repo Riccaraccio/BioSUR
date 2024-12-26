@@ -4,6 +4,7 @@ from typing import List, Optional
 from enum import IntEnum
 from species import ReferenceSpecies
 from species import ReferenceMixture
+import math
 
 class BiomassType(IntEnum):
     OTHERS = 0
@@ -139,7 +140,6 @@ class BioSUR:
 
         self.splitting_parameters = np.sum(self.optimization_parameters[self.optimization_index]
                                            * multiplier_matrix, axis=0).clip(0, 1)
-
         return self 
     
     def calculate_ratio_ref_species(self) -> 'BioSUR':
@@ -172,7 +172,34 @@ class BioSUR:
             'LIGC': epsilon*(1-gamma),
             'TANN': 1 - epsilon*gamma - epsilon*(1-gamma)
         })
+        return self
+    
+    def solve_linear_system(self) -> 'BioSUR':
+        """Solve the linear system of equations"""
+        # [ω_C^RM1    ω_C^RM2    ω_C^RM3  ] [x_1] = [ω_C^solid]
+        # [ω_H^RM1    ω_H^RM2    ω_H^RM3  ] [x_2] = [ω_H^solid]
+        # [ω_O^RM1    ω_O^RM2    ω_O^RM3  ] [x_3] = [ω_O^solid]
+        
+        A = np.array([
+            [self.RM1.C_frac, self.RM2.C_frac, self.RM3.C_frac],
+            [self.RM1.H_frac, self.RM2.H_frac, self.RM3.H_frac],
+            [self.RM1.O_frac, self.RM2.O_frac, self.RM3.O_frac]
+        ])
 
+        b = np.array([
+            self.input_composition['C'],
+            self.input_composition['H'],
+            self.input_composition['O']
+        ])
+
+        x = np.linalg.solve(A, b)
+
+        if not math.isclose(np.sum(x), 1):
+            raise ValueError("Solution of the linear sistem failed: sum of fractions is not 1")
+        
+        self.RM1.fraction = x[0]
+        self.RM2.fraction = x[1]
+        self.RM3.fraction = x[2]
         return self
 
 
@@ -181,6 +208,9 @@ class BioSUR:
     def calculate_output_composition(self) -> 'BioSUR':
         """Calculate output composition"""
         self.calculate_splitting_parameters()
+        self.calculate_ratio_ref_species()
+        self.solve_linear_system()
+
         #TODO 
 
         return self

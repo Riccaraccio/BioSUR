@@ -33,7 +33,7 @@ class ReferenceSpecies:
     
 @dataclass
 class ReferenceMixture:
-    __slots__ = ['C', 'H', 'O', 'MW', 'C_frac', 'H_frac', 'O_frac', 'composition']
+    __slots__ = ['C', 'H', 'O', 'MW', 'C_frac', 'H_frac', 'O_frac', 'composition', 'fraction']
     
     def __init__(self):
         self.C = 0.0
@@ -44,6 +44,7 @@ class ReferenceMixture:
         self.H_frac = 0.0
         self.O_frac = 0.0
         self.composition = {}
+        self.fraction = 0.0
         self.validate()
         self.calculate_fractions()
 
@@ -54,9 +55,9 @@ class ReferenceMixture:
     def calculate_fractions(self) -> None:
         self.calculate_molecular_weight()
         if self.MW != 0:
-            self.C_frac = self.C / self.MW
-            self.H_frac = self.H / self.MW
-            self.O_frac = self.O / self.MW
+            self.C_frac = self.C * 12.01 / self.MW
+            self.H_frac = self.H * 1.008 / self.MW
+            self.O_frac = self.O * 15.999/ self.MW
 
     def calculate_molecular_weight(self) -> float:
         self.MW = (self.C * 12.01 + 
@@ -66,7 +67,7 @@ class ReferenceMixture:
 
     def mix_species(self, species_weights: Dict[str, float]) -> None:
         ref_species = ReferenceSpecies()
-        self.composition = species_weights.copy()
+        self.composition = species_weights.copy() # Save the composition
         self.C = sum(w * ref_species[name]['C'] for name, w in species_weights.items())
         self.H = sum(w * ref_species[name]['H'] for name, w in species_weights.items())
         self.O = sum(w * ref_species[name]['O'] for name, w in species_weights.items())
