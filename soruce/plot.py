@@ -37,5 +37,4 @@ def plot_triangle (biosur: BioSUR) -> None:
     # Plot the biomass sample
     ax.scatter(biosur.input_composition['C'], biosur.input_composition['H'], label='Biomass', color='red', marker='x', s=100)
 
-
     plt.savefig('triangle.png')

@@ -10,5 +10,5 @@ if __name__ == "__main__":
     
     biosur.calculate_output_composition()
     plot_triangle(biosur)
-    
+ 
     print(biosur.output_composition)
