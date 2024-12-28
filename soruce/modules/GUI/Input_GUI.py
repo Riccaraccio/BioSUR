@@ -6,7 +6,7 @@ from modules.GUI.config import AppConfig
 class InputElement(customtkinter.CTkFrame):
     """A frame containing a labeled input field with optional validation."""
     
-    def __init__(self, master: customtkinter.CTkFrame, label_text: str, placeholder: str = AppConfig.DEFAULT_PLACEHOLDER, default_value: Optional[float] = None):
+    def __init__(self, master: customtkinter.CTkFrame, label_text: str, placeholder: str = AppConfig.DEFAULT_PLACEHOLDER):
         """Initialize the input element."""
         super().__init__(master)
         self.input_frame = master
@@ -15,15 +15,14 @@ class InputElement(customtkinter.CTkFrame):
         self.label = customtkinter.CTkLabel(self, text=label_text)
         self.label.grid(row=0, column=0, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="nswe")
         
-        self._setup_entry(label_text, placeholder, default_value)
+        self._setup_entry(label_text, placeholder)
     
-    def _setup_entry(self, label_text: str, placeholder: str, default_value: float) -> None:
+    def _setup_entry(self, label_text: str, placeholder: str) -> None:
         """Configure the entry widget based on the label type."""
         self.entry = customtkinter.CTkEntry(self, width=AppConfig.ENTRY_WIDTH, placeholder_text=placeholder)
         
         if label_text != "O":
             self.entry.configure(validate="key", validatecommand=(self.register(self.validate_number), '%P'))
-            self.entry.insert(0, default_value or 0)
             if label_text in ("C", "H"):
                 self.entry.bind("<KeyRelease>", lambda e: self.input_frame.calculate_and_update_O())
         else:
@@ -70,10 +69,10 @@ class ElementalCompositionInputFrame(customtkinter.CTkFrame):
         self.title_label = customtkinter.CTkLabel(self, text=self._title_text, fg_color="gray30", corner_radius=AppConfig.CORNER_RADIUS)
         self.title_label.grid(row=0, column=0, padx=AppConfig.PADDING, pady=(AppConfig.PADDING, 0), sticky="new", columnspan=3)
 
-        self.C = InputElement(self, "C", default_value=0.53)
+        self.C = InputElement(self, "C")
         self.C.grid(row=1, column=0, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="new")
 
-        self.H = InputElement(self, "H", default_value=0.06)
+        self.H = InputElement(self, "H")
         self.H.grid(row=1, column=1, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="new")
 
         self.O = InputElement(self, "O")
@@ -177,14 +176,13 @@ class InputFrame(customtkinter.CTkFrame):
     
     def get_all_values(self) -> dict:
         """Get all values from all input fields."""
-        return {
-            "elemental": self.elemental_composition_frame.get_values(),
-            "moisture_ash": self.moisture_ash_frame.get_values()
-        }
+        return self.elemental_composition_frame.get_values() | self.moisture_ash_frame.get_values()
     
     def set_all_values(self, values: dict) -> None:
         """Set values for all input fields."""
-        if "elemental" in values:
-            self.elemental_composition_frame.set_values(values["elemental"])
-        if "moisture_ash" in values:
-            self.moisture_ash_frame.set_values(values["moisture_ash"])
+        self.elemental_composition_frame.set_values(values)
+        self.moisture_ash_frame.set_values(values)
+
+    def set_biomass_type(self, index: int) -> None:
+        """Set the biomass type combobox to a specific index."""
+        self.biomass_type.set(BiomassType(index).name.capitalize())
