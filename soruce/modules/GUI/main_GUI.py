@@ -1,16 +1,7 @@
 import customtkinter
 from dataclasses import dataclass
 from modules.GUI.Input_GUI import InputFrame
-
-@dataclass
-class AppConfig:
-    """Configuration settings for the application."""
-    WINDOW_WIDTH: int = 1200
-    WINDOW_HEIGHT: int = 580
-    PADDING: int = 10
-    ENTRY_WIDTH: int = 100
-    CORNER_RADIUS: int = 6
-    DEFAULT_PLACEHOLDER: str = "0.0"
+from modules.GUI.config import AppConfig
 
 class App(customtkinter.CTk):
     """Main application window."""
