@@ -2,8 +2,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from typing import List, Optional
 from enum import IntEnum
-from species import ReferenceSpecies
-from species import ReferenceMixture
+from modules.BioSUR.species import ReferenceSpecies, ReferenceMixture
 import math
 import warnings
 

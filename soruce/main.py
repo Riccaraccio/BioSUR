@@ -1,7 +1,5 @@
-from BioSUR import BioSUR
-from species import ReferenceSpecies
-import numpy as np
-from plot import plot_triangle
+from modules.utils.plot import plot_triangle
+from modules.BioSUR.BioSUR import BioSUR
 
 if __name__ == "__main__":
     # Using the create method (recommended)
