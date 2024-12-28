@@ -32,7 +32,7 @@ class OutputFrame(customtkinter.CTkFrame):
             height=160,
             width=140
         )
-        self.output_text.grid(row=1, column=0, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="n")
+        self.output_text.grid(row=1, column=0, padx=AppConfig.PADDING, pady=AppConfig.PADDING)
         self.output_text.configure(state="disabled")
 
     def print_output_composition(self, output_composition: dict, biomass_type) -> None:

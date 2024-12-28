@@ -19,13 +19,13 @@ class App(customtkinter.CTk):
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure((0, 1, 2), weight=1)
 
-        default_values = {"C": 0.53, "H": 0.05, "ASH": 0, "MOIST": 0}
+        default_values = {"C": 0.53, "H": 0.06, "ASH": 0, "MOIST": 0}
         default_biomass_type = BiomassType.HARDWOOD
         
         # Create input frame
         self.input_frame = InputFrame(self)
         self.input_frame.grid(row=0, column=0, padx=AppConfig.PADDING, pady=(AppConfig.PADDING, 0), sticky="ew", columnspan=2)
-        self.input_frame.set_all_values(default_values) # Set default values
+        self.input_frame.set_all_values(default_values)
         self.input_frame.set_biomass_type(default_biomass_type)
 
         # Create BioSUR instance
@@ -45,10 +45,20 @@ class App(customtkinter.CTk):
         self.message_frame = MessageFrame(self)
         self.message_frame.grid(row=2, column=0, padx=AppConfig.PADDING, pady=(AppConfig.PADDING), sticky="ew", columnspan=2)
 
-        self.update_visual_output()
+        self.update_window()
 
-    def update_visual_output(self):
+    def update_window(self):
         """Update the output frame with the current BioSUR output composition."""
+        
+        input_composition = self.input_frame.get_all_values()
+        biomass_type = self.input_frame.get_biomass_type()
+
+        # Update BioSUR instance
+        self.biosur = BioSUR.create(C=input_composition["C"], H=input_composition["H"], ASH=input_composition["ASH"], MOIST=input_composition["MOIST"])
+        self.biosur.set_biomass_type(biomass_type)
+        # Recalculate output composition
+        self.biosur.calculate_output_composition()
+
         values_array = np.array(list(self.biosur.output_composition.values()))
         if np.any(values_array < 0):
             self.output_frame.set_output_color("red")
@@ -56,4 +66,6 @@ class App(customtkinter.CTk):
         else:
             self.output_frame.set_output_color("#00FF9F")
             self.message_frame.set_message("Done!", "#00FF9F")
+
+        #TODO: Update plot
         self.output_frame.print_output_composition(self.biosur.output_composition, self.biosur.biomass_type)

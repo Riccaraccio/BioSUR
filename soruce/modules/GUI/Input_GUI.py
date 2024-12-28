@@ -23,13 +23,21 @@ class InputElement(customtkinter.CTkFrame):
         
         if label_text != "O":
             self.entry.configure(validate="key", validatecommand=(self.register(self.validate_number), '%P'))
-            if label_text in ("C", "H"):
-                self.entry.bind("<KeyRelease>", lambda e: self.input_frame.calculate_and_update_O())
+            self.entry.bind("<KeyRelease>", self._handle_key_release)
         else:
             self.entry.insert(0, "0.0")
             self.entry.configure(state="readonly")
             
         self.entry.grid(row=0, column=1, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="nswe")
+    
+    def _handle_key_release(self, event) -> None:
+        """Handle key release event for C and H fields."""
+        if self.label.cget("text") in ["C", "H"]:
+            self.input_frame.calculate_and_update_O()
+        
+        parent = self.winfo_toplevel()
+        if hasattr(parent, "update_window"):
+            parent.update_window()
     
     @staticmethod
     def validate_number(value: str) -> bool:
@@ -170,7 +178,8 @@ class InputFrame(customtkinter.CTkFrame):
         self.combo_container.grid(row=1, column=0, sticky="n", padx=AppConfig.PADDING, pady=AppConfig.PADDING)
         
         # Add combobox
-        self.biomass_type = customtkinter.CTkComboBox(self.combo_container, values=[type.name.capitalize() for type in BiomassType], justify="center")
+        self.biomass_type = customtkinter.CTkComboBox(self.combo_container, values=[type.name.capitalize() for type in BiomassType], 
+                                                      justify="center", command=self._handle_biomass_type_change)
         self.biomass_type.set("Hardwood")
         self.biomass_type.pack(padx=AppConfig.PADDING, pady=AppConfig.PADDING)
     
@@ -186,3 +195,13 @@ class InputFrame(customtkinter.CTkFrame):
     def set_biomass_type(self, index: int) -> None:
         """Set the biomass type combobox to a specific index."""
         self.biomass_type.set(BiomassType(index).name.capitalize())
+
+    def get_biomass_type(self) -> int:
+        """Get the selected biomass type index."""
+        return BiomassType[self.biomass_type.get().upper()].value
+    
+    def _handle_biomass_type_change(self, choice) -> None:
+        """Handle biomass type change event."""
+        parent = self.winfo_toplevel()
+        if hasattr(parent, "update_window"):
+            parent.update_window()
