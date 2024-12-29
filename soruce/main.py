@@ -1,6 +1,6 @@
-from modules.utils.plot import plot_triangle
 from modules.BioSUR.BioSUR import BioSUR
 from modules.GUI.main_GUI import App
+import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     ## Using the create method (recommended)

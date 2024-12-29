@@ -5,6 +5,7 @@ from modules.GUI.Output_GUI import OutputFrame
 from modules.GUI.Plot_GUI import PlotFrame
 from modules.GUI.Message_GUI import MessageFrame
 from modules.BioSUR.BioSUR import BioSUR, BiomassType
+import matplotlib.pyplot as plt
 import numpy as np
 
 class App(customtkinter.CTk):
@@ -13,7 +14,6 @@ class App(customtkinter.CTk):
     def __init__(self):
         """Initialize the main application."""
         super().__init__()
-
         self.title("BioSUR")
         self.geometry(f"{AppConfig.WINDOW_WIDTH}x{AppConfig.WINDOW_HEIGHT}")
         self.grid_columnconfigure((0, 1), weight=1)
@@ -47,6 +47,8 @@ class App(customtkinter.CTk):
 
         self.update_window()
 
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
     def update_window(self):
         """Update the output frame with the current BioSUR output composition."""
         
@@ -67,5 +69,34 @@ class App(customtkinter.CTk):
             self.output_frame.set_output_color("#00FF9F")
             self.message_frame.set_message("Done!", "#00FF9F")
 
-        #TODO: Update plot
         self.output_frame.print_output_composition(self.biosur.output_composition, self.biosur.biomass_type)
+
+        self.plot_frame.update_plot()
+
+    def on_closing(self):
+        """Handle the closing event."""
+        try:
+            # First cancel any pending events
+            for after_id in self.tk.eval('after info').split():
+                try:
+                    self.after_cancel(after_id)
+                except:
+                    pass
+            
+            # Cleanup matplotlib
+            if hasattr(self, 'plot_frame'):
+                try:
+                    self.plot_frame.cleanup()
+                except:
+                    pass
+            
+            plt.close('all')
+            
+        except:
+            pass
+        
+        finally:
+            try:
+                self.quit()
+            except:
+                pass

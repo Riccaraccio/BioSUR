@@ -192,8 +192,8 @@ class BioSUR:
         if not math.isclose(np.sum(x), 1):
             raise ValueError("Solution of the linear sistem failed: sum of fractions is not 1")
         
-        if np.any(x < 0):
-            warnings.warn("Solution of the linear system failed: the biomass sample falls outside the triangle defined by the reference mixtures")
+        #if np.any(x < 0):
+        #   warnings.warn("Solution of the linear system failed: the biomass sample falls outside the triangle defined by the reference mixtures")
         
         # Convert to mole fractions
         self.RM1.fraction = x[0] / self.RM1.MW / (x[0]/self.RM1.MW + x[1]/self.RM2.MW + x[2]/self.RM3.MW)
