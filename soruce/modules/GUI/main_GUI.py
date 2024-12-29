@@ -8,7 +8,7 @@ from modules.BioSUR.BioSUR import BioSUR, BiomassType
 import matplotlib.pyplot as plt
 import numpy as np
 
-class App(customtkinter.CTk):
+class GUIBioSUR(customtkinter.CTk):
     """Main application window."""
     
     def __init__(self):
