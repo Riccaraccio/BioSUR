@@ -15,6 +15,8 @@ def create_triangle_plot(biosur: BioSUR):
     ax.set_ylabel('H fraction [-]')
     ax.set_xlim(0.43, 0.77)
     ax.set_ylim(0.02, 0.12)
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+    ax.set_title("Van Krevelen diagram")
 
     plot_elements = {}
 
@@ -30,16 +32,14 @@ def create_triangle_plot(biosur: BioSUR):
     # Plot RM points (these will update)
     rm_points = ax.scatter([biosur.RM1.C_frac, biosur.RM2.C_frac, biosur.RM3.C_frac],
                          [biosur.RM1.H_frac, biosur.RM2.H_frac, biosur.RM3.H_frac],
-                         label=['RM1', 'RM2', 'RM3'], color='blue', marker='o', s=100)
+                         label="Reference Mixtures", color='blue', marker='o', s=100)
     plot_elements['rm_points'] = rm_points
 
     # Plot reference species (these are static)
     ref_points = []
-    for species in ref_species.characteristics['name']:
-        point = ax.scatter(ref_species[species]['C_frac'], 
-                          ref_species[species]['H_frac'], 
-                          label=species, color='green', marker='s')
-        ref_points.append(point)
+    ref_points = ax.scatter([ref_species[species]['C_frac'] for species in ref_species.characteristics['name']],
+                          [ref_species[species]['H_frac'] for species in ref_species.characteristics['name']],
+                          color='green', marker='s', label='Reference Species')
     plot_elements['ref_species_points'] = ref_points
 
     # Plot connection lines
@@ -81,9 +81,11 @@ def create_triangle_plot(biosur: BioSUR):
     # Plot biomass point
     biomass = ax.scatter(biosur.input_composition['C'], 
                         biosur.input_composition['H'], 
-                        label='Biomass', color='red', 
+                        label='Sample', color='red', 
                         marker='x', s=100)
     plot_elements['biomass_point'] = biomass
+
+    ax.legend(loc="upper left", fontsize='small', frameon=True, edgecolor='black')
 
     return fig, ax, plot_elements
 

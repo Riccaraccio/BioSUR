@@ -3,36 +3,53 @@ from modules.GUI.config import AppConfig
 from modules.BioSUR.BioSUR import BiomassType
 
 class OutputFrame(customtkinter.CTkFrame):
+    """Frame for displaying output composition."""
+    
     def __init__(self, master: customtkinter.CTkFrame):
-        super().__init__(master)
+        """Initialize the output frame."""
+        super().__init__(
+            master,
+            fg_color=AppConfig.COLORS["BACKGROUND"]
+        )
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)  # Only row 1 needs weight since title should stay fixed
+        self.grid_rowconfigure(1, weight=1)
         
-        # Improved title styling
+        # Title label with updated styling
         self.title = customtkinter.CTkLabel(
             self,
             text="SURROGATE COMPOSITION",
-            fg_color="gray20",  # Darker background for better contrast
-            #text_color="light blue",  # More appealing text color
-            #font=("Roboto", 14, "bold"),  # Custom font and weight
-            height=35,  # Fixed height for title
+            fg_color=AppConfig.COLORS["HEADER_BACKGROUND"],
+            text_color=AppConfig.COLORS["HEADER_TEXT"],
+            font=AppConfig.FONTS["HEADER"],
+            height=35,
             corner_radius=AppConfig.CORNER_RADIUS
         )
-        self.title.grid(row=0, column=0, padx=AppConfig.PADDING, pady=(AppConfig.PADDING, 0), sticky="new")
+        self.title.grid(
+            row=0,
+            column=0,
+            padx=AppConfig.PADDING,
+            pady=(AppConfig.PADDING, 0),
+            #sticky="new"
+        )
 
-        # Improved textbox styling
+        # Output textbox with updated styling
         self.output_text = customtkinter.CTkTextbox(
             self,
             corner_radius=AppConfig.CORNER_RADIUS,
-            fg_color="gray10",  # Darker background for content
-            text_color="#00FF9F",  # Modern green color for values
-            font=("Consolas", 12),  # Monospace font for better alignment
-            border_width=1,  # Add subtle border
-            border_color="gray40",  # Border color
+            fg_color="#000000",
+            text_color=AppConfig.COLORS["PRIMARY_TEXT"],
+            font=("Consolas", 12),  # Keeping monospace font for alignment
+            border_width=1,
+            border_color=AppConfig.COLORS["INPUT_BORDER"],
             height=160,
             width=140
         )
-        self.output_text.grid(row=1, column=0, padx=AppConfig.PADDING, pady=AppConfig.PADDING)
+        self.output_text.grid(
+            row=1,
+            column=0,
+            padx=AppConfig.PADDING,
+            pady=AppConfig.PADDING,
+        )
         self.output_text.configure(state="disabled")
 
     def print_output_composition(self, output_composition: dict, biomass_type) -> None:
@@ -49,11 +66,13 @@ class OutputFrame(customtkinter.CTkFrame):
                     key = "XYHW"
                 elif biomass_type == BiomassType.SOFTWOOD:
                     key = "GMSW"
-                else: # BiomassType.OTHERS  and BiomassType.GRASS
+                else:  # BiomassType.OTHERS and BiomassType.GRASS
                     key = "XYGR"
 
             formatted_value = f"{value:.4f}" if isinstance(value, float) else str(value)
-            self.output_text.insert("end", f"{key}\t {formatted_value}\n")
+            # Add padding to keys for better alignment
+            padded_key = f"{key:<6}"  # Left-align with minimum 6 characters
+            self.output_text.insert("end", f"{padded_key} {formatted_value}\n")
 
         self.output_text.configure(state="disabled")
     

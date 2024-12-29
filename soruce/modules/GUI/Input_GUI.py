@@ -8,18 +8,32 @@ class InputElement(customtkinter.CTkFrame):
     
     def __init__(self, master: customtkinter.CTkFrame, label_text: str, placeholder: str = AppConfig.DEFAULT_PLACEHOLDER):
         """Initialize the input element."""
-        super().__init__(master)
+        super().__init__(master, fg_color=AppConfig.COLORS["SECONDARY_BACKGROUND"])
         self.input_frame = master
         self.grid_columnconfigure((0, 1), weight=1)
         
-        self.label = customtkinter.CTkLabel(self, text=label_text)
+        self.label = customtkinter.CTkLabel(
+            self, 
+            text=label_text,
+            text_color=AppConfig.COLORS["PRIMARY_TEXT"],
+            font=AppConfig.FONTS["DEFAULT"]
+        )
         self.label.grid(row=0, column=0, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="nswe")
         
         self._setup_entry(label_text, placeholder)
     
     def _setup_entry(self, label_text: str, placeholder: str) -> None:
         """Configure the entry widget based on the label type."""
-        self.entry = customtkinter.CTkEntry(self, width=AppConfig.ENTRY_WIDTH, placeholder_text=placeholder)
+        self.entry = customtkinter.CTkEntry(
+            self,
+            width=AppConfig.ENTRY_WIDTH,
+            placeholder_text=placeholder,
+            fg_color=AppConfig.COLORS["INPUT_BACKGROUND"],
+            text_color=AppConfig.COLORS["PRIMARY_TEXT"],
+            placeholder_text_color=AppConfig.COLORS["SECONDARY_TEXT"],
+            border_color=AppConfig.COLORS["INPUT_BORDER"],
+            font=AppConfig.FONTS["DEFAULT"]
+        )
         
         if label_text != "O":
             self.entry.configure(validate="key", validatecommand=(self.register(self.validate_number), '%P'))
@@ -70,11 +84,18 @@ class ElementalCompositionInputFrame(customtkinter.CTkFrame):
     
     def __init__(self, master: customtkinter.CTkFrame):
         """Initialize the elemental composition frame."""
-        super().__init__(master)
+        super().__init__(master, fg_color=AppConfig.COLORS["BACKGROUND"])
         self.grid_columnconfigure((0, 1), weight=1)
         
         self._title_text = "Elemental composition DAF wt."
-        self.title_label = customtkinter.CTkLabel(self, text=self._title_text, fg_color="gray30", corner_radius=AppConfig.CORNER_RADIUS)
+        self.title_label = customtkinter.CTkLabel(
+            self,
+            text=self._title_text,
+            fg_color=AppConfig.COLORS["HEADER_BACKGROUND"],
+            text_color=AppConfig.COLORS["HEADER_TEXT"],
+            corner_radius=AppConfig.CORNER_RADIUS,
+            font=AppConfig.FONTS["HEADER"]
+        )
         self.title_label.grid(row=0, column=0, padx=AppConfig.PADDING, pady=(AppConfig.PADDING, 0), sticky="new", columnspan=3)
 
         self.C = InputElement(self, "C")
@@ -117,11 +138,18 @@ class MoistureAshInputFrame(customtkinter.CTkFrame):
     
     def __init__(self, master: customtkinter.CTkFrame):
         """Initialize the moisture and ash frame."""
-        super().__init__(master)
+        super().__init__(master, fg_color=AppConfig.COLORS["BACKGROUND"])
         self.grid_columnconfigure((0, 1), weight=1)
         
         self._title_text = "Moisture & Ash wt."
-        self.title_label = customtkinter.CTkLabel(self, text=self._title_text, fg_color="gray30", corner_radius=AppConfig.CORNER_RADIUS)
+        self.title_label = customtkinter.CTkLabel(
+            self,
+            text=self._title_text,
+            fg_color=AppConfig.COLORS["HEADER_BACKGROUND"],
+            text_color=AppConfig.COLORS["HEADER_TEXT"],
+            corner_radius=AppConfig.CORNER_RADIUS,
+            font=AppConfig.FONTS["HEADER"]
+        )
         self.title_label.grid(row=0, column=0, padx=AppConfig.PADDING, pady=(AppConfig.PADDING, 0), sticky="new", columnspan=2)
 
         self.MOIST = InputElement(self, "MOIST")
@@ -144,15 +172,22 @@ class InputFrame(customtkinter.CTkFrame):
     
     def __init__(self, master: customtkinter.CTk):
         """Initialize the main input frame."""
-        super().__init__(master)
+        super().__init__(master, fg_color=AppConfig.COLORS["BACKGROUND"])
         self.grid_columnconfigure((0, 1), weight=1)
         
         self._title_text = "INPUT"
-        self.title_label = customtkinter.CTkLabel(self, text=self._title_text, fg_color="gray30", corner_radius=AppConfig.CORNER_RADIUS)
+        self.title_label = customtkinter.CTkLabel(
+            self,
+            text=self._title_text,
+            fg_color=AppConfig.COLORS["HEADER_BACKGROUND"],
+            text_color=AppConfig.COLORS["HEADER_TEXT"],
+            corner_radius=AppConfig.CORNER_RADIUS,
+            font=AppConfig.FONTS["HEADER"]
+        )
         self.title_label.grid(row=0, column=0, padx=AppConfig.PADDING, pady=(AppConfig.PADDING, 0), sticky="new", columnspan=2)
 
         # Create frames container
-        self.frames_container = customtkinter.CTkFrame(self)
+        self.frames_container = customtkinter.CTkFrame(self, fg_color=AppConfig.COLORS["BACKGROUND"])
         self.frames_container.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=AppConfig.PADDING, pady=AppConfig.PADDING)
         self.frames_container.grid_columnconfigure((0, 1, 2), weight=1)
 
@@ -164,22 +199,42 @@ class InputFrame(customtkinter.CTkFrame):
         self.moisture_ash_frame.grid(row=0, column=1, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="nsew")
 
         # Add Biomass Type frame
-        self.biomass_type_frame = customtkinter.CTkFrame(self.frames_container)
+        self.biomass_type_frame = customtkinter.CTkFrame(self.frames_container, fg_color=AppConfig.COLORS["BACKGROUND"])
         self.biomass_type_frame.grid(row=0, column=2, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="nsew")
         self.biomass_type_frame.grid_columnconfigure(0, weight=1)
         self.biomass_type_frame.grid_rowconfigure(1, weight=1)
         
         # Add title to Biomass Type frame
-        self.biomass_type_label = customtkinter.CTkLabel(self.biomass_type_frame, text="Biomass Type", fg_color="gray30", corner_radius=AppConfig.CORNER_RADIUS)
+        self.biomass_type_label = customtkinter.CTkLabel(
+            self.biomass_type_frame,
+            text="Biomass Type",
+            fg_color=AppConfig.COLORS["HEADER_BACKGROUND"],
+            text_color=AppConfig.COLORS["HEADER_TEXT"],
+            corner_radius=AppConfig.CORNER_RADIUS,
+            font=AppConfig.FONTS["HEADER"]
+        )
         self.biomass_type_label.grid(row=0, column=0, padx=AppConfig.PADDING, pady=(AppConfig.PADDING, 0), sticky="ew")
 
         # Container for combobox to match input fields height
-        self.combo_container = customtkinter.CTkFrame(self.biomass_type_frame)
+        self.combo_container = customtkinter.CTkFrame(self.biomass_type_frame, fg_color=AppConfig.COLORS["SECONDARY_BACKGROUND"])
         self.combo_container.grid(row=1, column=0, sticky="n", padx=AppConfig.PADDING, pady=AppConfig.PADDING)
         
         # Add combobox
-        self.biomass_type = customtkinter.CTkComboBox(self.combo_container, values=[type.name.capitalize() for type in BiomassType], 
-                                                      justify="center", command=self._handle_biomass_type_change)
+        self.biomass_type = customtkinter.CTkComboBox(
+            self.combo_container,
+            values=[type.name.capitalize() for type in BiomassType],
+            justify="center",
+            command=self._handle_biomass_type_change,
+            fg_color=AppConfig.COLORS["INPUT_BACKGROUND"],
+            text_color=AppConfig.COLORS["PRIMARY_TEXT"],
+            button_color=AppConfig.COLORS["PRIMARY_BUTTON"],
+            button_hover_color=AppConfig.COLORS["BUTTON_HOVER"],
+            border_color=AppConfig.COLORS["INPUT_BORDER"],
+            dropdown_fg_color=AppConfig.COLORS["SECONDARY_BACKGROUND"],
+            dropdown_text_color=AppConfig.COLORS["PRIMARY_TEXT"],
+            dropdown_hover_color=AppConfig.COLORS["BUTTON_HOVER"],
+            font=AppConfig.FONTS["DEFAULT"]
+        )
         self.biomass_type.set("Hardwood")
         self.biomass_type.pack(padx=AppConfig.PADDING, pady=AppConfig.PADDING)
     
