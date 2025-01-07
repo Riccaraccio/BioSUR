@@ -1,9 +1,6 @@
-# modules/utils/plot.py
-
 from modules.BioSUR.species import ReferenceSpecies
 from modules.BioSUR.BioSUR import BioSUR
 from matplotlib import pyplot as plt
-import numpy as np
 
 def create_triangle_plot(biosur: BioSUR):
     """Creates the initial plot with all static elements"""

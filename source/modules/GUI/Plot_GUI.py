@@ -3,7 +3,6 @@ from modules.GUI.config import AppConfig
 from modules.utils.plot import create_triangle_plot, update_triangle_plot
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from PIL import Image
 
 class PlotFrame(customtkinter.CTkFrame):
     """Frame for displaying and managing the triangle plot."""

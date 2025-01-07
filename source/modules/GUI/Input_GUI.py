@@ -1,5 +1,4 @@
 import customtkinter
-from typing import Optional
 from modules.BioSUR.BioSUR import BiomassType
 from modules.GUI.config import AppConfig 
 

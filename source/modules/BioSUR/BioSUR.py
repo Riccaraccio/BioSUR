@@ -1,10 +1,8 @@
 from dataclasses import dataclass, field
 import numpy as np
-from typing import List, Optional
 from enum import IntEnum
 from modules.BioSUR.species import ReferenceSpecies, ReferenceMixture
 import math
-import warnings
 
 class BiomassType(IntEnum):
     OTHERS = 0

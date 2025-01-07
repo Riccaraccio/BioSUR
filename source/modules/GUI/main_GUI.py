@@ -24,7 +24,7 @@ class GUIBioSUR(customtkinter.CTk):
         # Configure main window
         self.title("BioSUR")
         if platform.system() == "Windows":
-            ico_path = self.resource_path("modules\\utils\\logo-creck.ico")
+            ico_path = self.resource_path("source\\modules\\utils\\logo-creck.ico")
             self.iconbitmap(self.resource_path(ico_path))
         else:
             ico_path = self.resource_path("modules/utils/logo-creck.png")
