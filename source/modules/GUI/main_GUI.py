@@ -10,6 +10,7 @@ import numpy as np
 import platform
 import tkinter as tk
 import os
+import sys
 
 class GUIBioSUR(customtkinter.CTk):
     """Main application window."""
@@ -23,11 +24,11 @@ class GUIBioSUR(customtkinter.CTk):
         # Configure main window
         self.title("BioSUR")
         if platform.system() == "Windows":
-            ico_path = os.path.join(script_dir, "../utils/logo-creck.ico")
-            self.iconbitmap(ico_path)
+            ico_path = self.resource_path("modules\\utils\\logo-creck.ico")
+            self.iconbitmap(self.resource_path(ico_path))
         else:
-            ico_path = os.path.join(script_dir, "../utils/logo-creck.png")
-            icon = tk.PhotoImage(file="utils/logo-creck.png")
+            ico_path = self.resource_path("modules/utils/logo-creck.png")
+            icon = tk.PhotoImage(file=ico_path)
             self.iconphoto(True, icon)
 
         self.geometry(f"{AppConfig.WINDOW_WIDTH}x{AppConfig.WINDOW_HEIGHT}")
@@ -175,3 +176,13 @@ class GUIBioSUR(customtkinter.CTk):
                 self.quit()
             except Exception as e:
                 print(f"Error quitting application: {e}")
+
+    def resource_path(self, relative_path):
+        """ Get absolute path to resource, works for dev and for PyInstaller """
+        try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+
+        return os.path.join(base_path, relative_path)

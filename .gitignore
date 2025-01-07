@@ -1,1 +1,6 @@
 **/__pycache__/
+**/build/
+**/dist/
+source/logo-creck.ico
+source/main.spec
+source/BioSUR.spec
