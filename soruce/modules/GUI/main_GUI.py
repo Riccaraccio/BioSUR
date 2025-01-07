@@ -7,6 +7,9 @@ from modules.GUI.Message_GUI import MessageFrame
 from modules.BioSUR.BioSUR import BioSUR, BiomassType
 import matplotlib.pyplot as plt
 import numpy as np
+import platform
+import tkinter as tk
+import os
 
 class GUIBioSUR(customtkinter.CTk):
     """Main application window."""
@@ -15,8 +18,18 @@ class GUIBioSUR(customtkinter.CTk):
         """Initialize the main application."""
         super().__init__()
         
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
         # Configure main window
         self.title("BioSUR")
+        if platform.system() == "Windows":
+            ico_path = os.path.join(script_dir, "../utils/logo-creck.ico")
+            self.iconbitmap(ico_path)
+        else:
+            ico_path = os.path.join(script_dir, "../utils/logo-creck.png")
+            icon = tk.PhotoImage(file="utils/logo-creck.png")
+            self.iconphoto(True, icon)
+
         self.geometry(f"{AppConfig.WINDOW_WIDTH}x{AppConfig.WINDOW_HEIGHT}")
         self.configure(fg_color=AppConfig.COLORS["MAIN_BACKGROUND"])
         
