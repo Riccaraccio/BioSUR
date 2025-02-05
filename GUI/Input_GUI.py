@@ -1,6 +1,6 @@
 import customtkinter
-from modules.BioSUR.BioSUR import BiomassType
-from modules.GUI.config import AppConfig 
+from BioSUR.BioSUR import BiomassType
+from GUI.config import AppConfig 
 
 class InputElement(customtkinter.CTkFrame):
     """A frame containing a labeled input field with optional validation."""

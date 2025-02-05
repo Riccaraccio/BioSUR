@@ -1,10 +1,10 @@
 import customtkinter
-from modules.GUI.Input_GUI import InputFrame
-from modules.GUI.config import AppConfig
-from modules.GUI.Output_GUI import OutputFrame
-from modules.GUI.Plot_GUI import PlotFrame
-from modules.GUI.Message_GUI import MessageFrame
-from modules.BioSUR.BioSUR import BioSUR, BiomassType
+from GUI.Input_GUI import InputFrame
+from GUI.config import AppConfig
+from GUI.Output_GUI import OutputFrame
+from GUI.Plot_GUI import PlotFrame
+from GUI.Message_GUI import MessageFrame
+from BioSUR.BioSUR import BioSUR, BiomassType
 import matplotlib.pyplot as plt
 import numpy as np
 import platform
@@ -24,10 +24,10 @@ class GUIBioSUR(customtkinter.CTk):
         # Configure main window
         self.title("BioSUR")
         if platform.system() == "Windows":
-            ico_path = self.resource_path("source\\modules\\utils\\logo-creck.ico")
+            ico_path = self.resource_path("GUI\\logo-creck.ico")
             self.iconbitmap(self.resource_path(ico_path))
         else:
-            ico_path = self.resource_path("modules/utils/logo-creck.png")
+            ico_path = self.resource_path("GUI/logo-creck.png")
             icon = tk.PhotoImage(file=ico_path)
             self.iconphoto(True, icon)
 

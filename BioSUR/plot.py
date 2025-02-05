@@ -1,5 +1,5 @@
-from modules.BioSUR.species import ReferenceSpecies
-from modules.BioSUR.BioSUR import BioSUR
+from BioSUR.species import ReferenceSpecies
+from BioSUR.BioSUR import BioSUR
 from matplotlib import pyplot as plt
 
 def create_triangle_plot(biosur: BioSUR):

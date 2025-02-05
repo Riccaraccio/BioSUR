@@ -1,5 +1,5 @@
 import customtkinter
-from modules.GUI.config import AppConfig
+from GUI.config import AppConfig
 
 class MessageFrame(customtkinter.CTkFrame):
     """Frame for displaying status messages."""

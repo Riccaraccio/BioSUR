@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import numpy as np
 from enum import IntEnum
-from modules.BioSUR.species import ReferenceSpecies, ReferenceMixture
+from BioSUR.species import ReferenceSpecies, ReferenceMixture
 import math
 
 class BiomassType(IntEnum):

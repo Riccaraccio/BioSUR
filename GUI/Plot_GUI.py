@@ -1,6 +1,6 @@
 import customtkinter
-from modules.GUI.config import AppConfig
-from modules.utils.plot import create_triangle_plot, update_triangle_plot
+from GUI.config import AppConfig
+from BioSUR.plot import create_triangle_plot, update_triangle_plot
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 

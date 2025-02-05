@@ -1,6 +1,6 @@
 import customtkinter
-from modules.GUI.config import AppConfig
-from modules.BioSUR.BioSUR import BiomassType
+from GUI.config import AppConfig
+from BioSUR.BioSUR import BiomassType
 
 class OutputFrame(customtkinter.CTkFrame):
     """Frame for displaying output composition."""
