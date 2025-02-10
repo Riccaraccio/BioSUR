@@ -82,8 +82,23 @@ def create_triangle_plot(biosur: BioSUR):
                         marker='x', s=100)
     plot_elements['biomass_point'] = biomass
 
-    ax.legend(loc="upper left", fontsize='small', frameon=True, edgecolor='black')
+    # Add extrapolated point and line
+    if biosur.enable_extrapolation and biosur.is_outside_triangle(biosur.input_composition["C"], biosur.input_composition["H"]):
+        # Extrapolated point
+        extrap_point = ax.scatter(biosur.extrapolated_composition["C"], 
+                                  biosur.extrapolated_composition["H"], 
+                                  label='Extrapolated', color='orange', 
+                                  marker='x', s=100)
+        plot_elements['extrap_point'] = extrap_point
 
+        # Extrapolated line
+        line, = ax.plot([biosur.input_composition["C"], biosur.extrapolated_composition["C"]], 
+                        [biosur.input_composition["H"], biosur.extrapolated_composition["H"]], 
+                        color='orange', linestyle='--')
+        plot_elements['extrap_line'] = line
+
+    ax.legend(loc="upper left", fontsize='small', frameon=True, edgecolor='black')
+    
     return fig, ax, plot_elements
 
 def update_triangle_plot(biosur: BioSUR, plot_elements):
@@ -138,3 +153,13 @@ def update_triangle_plot(biosur: BioSUR, plot_elements):
     # Update biomass point
     plot_elements['biomass_point'].set_offsets([[biosur.input_composition['C'],
                                                biosur.input_composition['H']]])
+ 
+    # Update extrapolated point and line
+    if biosur.enable_extrapolation and biosur.is_outside_triangle(biosur.input_composition["C"], biosur.input_composition["H"]):
+        # Extrapolated point
+        plot_elements['extrap_point'].set_offsets([[biosur.extrapolated_composition["C"],
+                                                  biosur.extrapolated_composition["H"]]])
+        
+        # Extrapolated line
+        plot_elements['extrap_line'].set_data([biosur.input_composition["C"], biosur.extrapolated_composition["C"]],
+                                            [biosur.input_composition["H"], biosur.extrapolated_composition["H"]])

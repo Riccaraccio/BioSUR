@@ -55,6 +55,14 @@ class BioSUR:
         [-13.807, -0.207, 12.461, 13.422, 41.335]]
     ]))
 
+    use_extrapolation: bool = field(default=False)
+
+    extrapolated_composition: np.ndarray = field(default_factory=lambda: np.zeros(1, dtype=[
+        ('C', 'f8'),
+        ('H', 'f8'),
+        ('O', 'f8'),
+    ])[0])
+
     optimization_index: int = field(default=0)
 
     # Biomass type
@@ -172,7 +180,7 @@ class BioSUR:
         # [ω_C^RM1    ω_C^RM2    ω_C^RM3  ] [x_1] = [ω_C^solid]
         # [ω_H^RM1    ω_H^RM2    ω_H^RM3  ] [x_2] = [ω_H^solid]
         # [ω_O^RM1    ω_O^RM2    ω_O^RM3  ] [x_3] = [ω_O^solid]
-        
+
         A = np.array([
             [self.RM1.C_frac, self.RM2.C_frac, self.RM3.C_frac],
             [self.RM1.H_frac, self.RM2.H_frac, self.RM3.H_frac],
@@ -185,6 +193,14 @@ class BioSUR:
             self.input_composition['O']
         ])
 
+        if self.is_outside_triangle(self.input_composition["C"], self.input_composition["H"]) and self.use_extrapolation:
+            self.extrapolate_composition()
+            b = np.array([
+                self.extrapolated_composition['C'],
+                self.extrapolated_composition['H'],
+                self.extrapolated_composition['O']
+            ])
+    
         x = np.linalg.solve(A, b)
 
         if not math.isclose(np.sum(x), 1):
@@ -196,7 +212,8 @@ class BioSUR:
         # Convert to mole fractions
         self.RM1.fraction = x[0] / self.RM1.MW / (x[0]/self.RM1.MW + x[1]/self.RM2.MW + x[2]/self.RM3.MW)
         self.RM2.fraction = x[1] / self.RM2.MW / (x[0]/self.RM1.MW + x[1]/self.RM2.MW + x[2]/self.RM3.MW)
-        self.RM3.fraction = x[2] / self.RM3.MW / (x[0]/self.RM1.MW + x[1]/self.RM2.MW + x[2]/self.RM3.MW)
+        self.RM3.fraction = x[2] / self.RM3.MW / (x[0]/self.RM1.MW + x[1]/self.RM2.MW + x[2]/self.RM3.MW) 
+        
         return self
 
     def calculate_output_composition(self) -> 'BioSUR':
@@ -224,3 +241,59 @@ class BioSUR:
                                    for key in self.output_composition.dtype.names}
         
         return self
+    
+    def enable_extrapolation(self, on:bool) -> 'BioSUR':
+        """Enable or disable the extrapolation of the composition"""
+        self.use_extrapolation = on
+        return self
+    
+    def extrapolate_composition(self) -> np.ndarray:
+        """Extrapolate the composition"""
+        #check if the input composition in outside the triangle defined by the reference mixtures
+        print("WARNING: The input composition is outside the triangle defined by the reference mixtures. Extrapolating the composition...")
+
+        self.extrapolated_composition = self.input_composition.copy()
+
+        # Calculate the bariocenter of the triangle defined by the reference mixtures
+        bariocenter = np.array([np.sum([self.RM1.C_frac, self.RM2.C_frac, self.RM3.C_frac])/3,
+                                np.sum([self.RM1.H_frac, self.RM2.H_frac, self.RM3.H_frac])/3])
+
+        # Calculate the vector from the bariocenter to the input composition
+        vector = np.array([self.input_composition["C"] - bariocenter[0],
+                            self.input_composition["H"] - bariocenter[1]])
+        
+        while self.is_outside_triangle(self.extrapolated_composition["C"], self.extrapolated_composition["H"]):
+            # Move the input composition towards the bariocenter
+            self.extrapolated_composition["C"] -= vector[0] * 0.01
+            self.extrapolated_composition["H"] -= vector[1] * 0.01
+            self.extrapolated_composition["O"] = 1 - self.extrapolated_composition["C"] - self.extrapolated_composition["H"]
+
+        return self
+
+    def is_outside_triangle(self, C, H) -> bool:
+        """Check if a point is inside the triangle defined by the reference mixtures"""
+
+        #if the reference mixtures are not defined, calculate them
+        if self.RM1.C_frac <= 0 or self.RM2.C_frac <= 0 or self.RM3.C_frac <= 0:
+            self.calculate_splitting_parameters()
+            self.calculate_ratio_ref_species()
+
+        # Create point and vertices arrays
+        P = [C, H]
+        A = [self.RM1.C_frac, self.RM1.H_frac]
+        B = [self.RM2.C_frac, self.RM2.H_frac]
+        C = [self.RM3.C_frac, self.RM3.H_frac]
+
+        # Calculate barycentric coordinates
+        area = 0.5 * (A[0]*(B[1] - C[1]) + B[0]*(C[1] - A[1]) + C[0]*(A[1] - B[1]))
+        
+        # Calculate first coordinate
+        coord1 = (P[0]*(B[1] - C[1]) + B[0]*(C[1] - P[1]) + C[0]*(P[1] - B[1])) / (2*area)
+        
+        # Calculate second coordinate  
+        coord2 = (A[0]*(P[1] - C[1]) + P[0]*(C[1] - A[1]) + C[0]*(A[1] - P[1])) / (2*area)
+        
+        # Calculate third coordinate
+        coord3 = 1 - coord1 - coord2
+        
+        return coord1 < 0 or coord2 < 0 or coord3 < 0
