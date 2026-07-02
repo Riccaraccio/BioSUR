@@ -4,7 +4,7 @@ from GUI.config import AppConfig
 from GUI.Output_GUI import OutputFrame
 from GUI.Plot_GUI import PlotFrame
 from GUI.Message_GUI import MessageFrame
-from BioSUR.BioSUR import BioSUR, BiomassType
+from BioSUR.core import BioSUR, BiomassType
 import matplotlib.pyplot as plt
 import numpy as np
 import platform

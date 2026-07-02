@@ -55,7 +55,7 @@ jobs:
         run: |
           mkdir -p out
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cp dist/BioSUR.exe "out/BioSUR-windows.exe"
+            cp dist/BioSUR.exe "out/BioSUR.exe"
           elif [ "$RUNNER_OS" = "macOS" ]; then
             # ditto produces a Finder-compatible zip of the .app bundle
             ditto -c -k --keepParent dist/BioSUR.app "out/BioSUR-macos.zip"

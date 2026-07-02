@@ -1,4 +1,4 @@
-from BioSUR.BioSUR import BioSUR
+from BioSUR.core import BioSUR
 from GUI.main_GUI import GUIBioSUR
 import matplotlib.pyplot as plt
 from BioSUR.plot import create_triangle_plot

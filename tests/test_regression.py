@@ -15,7 +15,7 @@ import os
 
 import pytest
 
-from BioSUR.BioSUR import BioSUR
+from BioSUR.core import BioSUR
 
 GOLDEN_PATH = os.path.join(os.path.dirname(__file__), "golden_composition.json")
 
