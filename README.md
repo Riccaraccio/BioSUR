@@ -80,7 +80,7 @@ python main.py
 Besides the GUI, the characterization can be run directly from Python:
 
 ```python
-from BioSUR.BioSUR import BioSUR
+from BioSUR.core import BioSUR
 
 # Create a sample (C and H as DAF mass fractions)
 biosur = BioSUR.create(C=0.50, H=0.06, ASH=0.0, MOIST=0.0)

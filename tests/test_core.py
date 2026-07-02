@@ -4,7 +4,7 @@ import math
 import numpy as np
 import pytest
 
-from BioSUR.BioSUR import BioSUR, BiomassType
+from BioSUR.core import BioSUR, BiomassType
 
 
 def _make(C=0.53, H=0.06, ASH=0.0, MOIST=0.0, bt=BiomassType.HARDWOOD, extra=False):

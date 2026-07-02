@@ -1,5 +1,5 @@
 import customtkinter
-from BioSUR.BioSUR import BiomassType
+from BioSUR.core import BiomassType
 from GUI.config import AppConfig 
 
 class InputElement(customtkinter.CTkFrame):
