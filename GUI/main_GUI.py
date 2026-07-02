@@ -18,8 +18,6 @@ class GUIBioSUR(customtkinter.CTk):
     def __init__(self):
         """Initialize the main application."""
         super().__init__()
-        
-        script_dir = os.path.dirname(os.path.abspath(__file__))
 
         # Configure main window
         self.title("BioSUR")
@@ -122,10 +120,11 @@ class GUIBioSUR(customtkinter.CTk):
                 MOIST=input_composition["MOIST"]
             )
             self.biosur.set_biomass_type(biomass_type)
+            self.biosur.enable_extrapolation(self.input_frame.get_extrapolation())
             self.biosur.calculate_output_composition()
 
             # Check validity and update UI accordingly
-            values_array = np.array(list(self.biosur.output_composition.values()))
+            values_array = self.biosur.output_array
             if np.any(values_array < 0):
                 self.output_frame.set_output_color(AppConfig.COLORS["ERROR"])
                 self.message_frame.set_message(

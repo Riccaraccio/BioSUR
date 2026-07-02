@@ -236,7 +236,21 @@ class InputFrame(customtkinter.CTkFrame):
         )
         self.biomass_type.set("Hardwood")
         self.biomass_type.pack(padx=AppConfig.PADDING, pady=AppConfig.PADDING)
-    
+
+        # Extrapolation toggle: enable/disable composition extrapolation for
+        # samples that fall outside the reference-mixture triangle.
+        self.extrapolation_switch = customtkinter.CTkSwitch(
+            self.combo_container,
+            text="Extrapolation",
+            command=self._handle_biomass_type_change,
+            progress_color=AppConfig.COLORS["PRIMARY_BUTTON"],
+            button_hover_color=AppConfig.COLORS["BUTTON_HOVER"],
+            text_color=AppConfig.COLORS["PRIMARY_TEXT"],
+            font=AppConfig.FONTS["DEFAULT"]
+        )
+        self.extrapolation_switch.deselect()  # default: off
+        self.extrapolation_switch.pack(padx=AppConfig.PADDING, pady=(0, AppConfig.PADDING))
+
     def get_all_values(self) -> dict:
         """Get all values from all input fields."""
         return self.elemental_composition_frame.get_values() | self.moisture_ash_frame.get_values()
@@ -253,9 +267,17 @@ class InputFrame(customtkinter.CTkFrame):
     def get_biomass_type(self) -> int:
         """Get the selected biomass type index."""
         return BiomassType[self.biomass_type.get().upper()].value
-    
-    def _handle_biomass_type_change(self, choice) -> None:
-        """Handle biomass type change event."""
+
+    def get_extrapolation(self) -> bool:
+        """Get whether the extrapolation toggle is enabled."""
+        return bool(self.extrapolation_switch.get())
+
+    def _handle_biomass_type_change(self, choice=None) -> None:
+        """Trigger a recompute when an input control changes.
+
+        Accepts an optional argument so it can serve both the combobox (which
+        passes the selected value) and the switch (which passes nothing).
+        """
         parent = self.winfo_toplevel()
         if hasattr(parent, "update_window"):
             parent.update_window()
