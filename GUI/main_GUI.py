@@ -112,24 +112,35 @@ class GUIBioSUR(customtkinter.CTk):
             input_composition = self.input_frame.get_all_values()
             biomass_type = self.input_frame.get_biomass_type()
 
+            n_rich = self.input_frame.get_n_rich()
+
             # Update BioSUR instance
             self.biosur = BioSUR.create(
                 C=input_composition["C"],
                 H=input_composition["H"],
+                N=input_composition["N"],
                 ASH=input_composition["ASH"],
                 MOIST=input_composition["MOIST"]
             )
             self.biosur.set_biomass_type(biomass_type)
             self.biosur.enable_extrapolation(self.input_frame.get_extrapolation())
+            self.biosur.enable_N_rich_characterization(n_rich)
             self.biosur.calculate_output_composition()
 
-            # Check validity and update UI accordingly
+            # Check validity and update UI accordingly. Priority: outside-triangle
+            # error, then the high-nitrogen nudge, then success.
             values_array = self.biosur.output_array
             if np.any(values_array < 0):
                 self.output_frame.set_output_color(AppConfig.COLORS["ERROR"])
                 self.message_frame.set_message(
                     "The sample composition lies outside the characterization triangle!",
                     AppConfig.COLORS["ERROR"]
+                )
+            elif input_composition["N"] > 0.05 and not n_rich:
+                self.output_frame.set_output_color(AppConfig.COLORS["SUCCESS"])
+                self.message_frame.set_message(
+                    "High nitrogen content (>5%). Consider enabling N-rich composition.",
+                    AppConfig.COLORS["WARNING"]
                 )
             else:
                 self.output_frame.set_output_color(AppConfig.COLORS["SUCCESS"])

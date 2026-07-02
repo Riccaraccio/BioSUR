@@ -17,6 +17,7 @@ class BioSUR:
         ('C', 'f8'),
         ('H', 'f8'),
         ('O', 'f8'),
+        ('N', 'f8'),
         ('ASH', 'f8'),
         ('MOIST', 'f8')
     ])[0])
@@ -30,8 +31,19 @@ class BioSUR:
         ('LIGC', 'f8'),
         ('TANN', 'f8'),
         ('TGL', 'f8'),
+        ('PROTC', 'f8'),
+        ('PROTH', 'f8'),
+        ('PROTO', 'f8'),
         ('ASH', 'f8'),
         ('MOIST', 'f8')
+    ])[0])
+
+    # Protein splitting parameter (fraction of protein assigned to each protein
+    # reference species); only used when N-rich characterization is enabled.
+    protein_splitting_parameter: np.ndarray = field(default_factory=lambda: np.zeros(1, dtype=[
+        ('protc', 'f8'),
+        ('proth', 'f8'),
+        ('proto', 'f8')
     ])[0])
 
     # Splitting parameters
@@ -56,6 +68,7 @@ class BioSUR:
     ]))
 
     use_extrapolation: bool = field(default=False)
+    use_N_rich_characterization: bool = field(default=False)
 
     extrapolated_composition: np.ndarray = field(default_factory=lambda: np.zeros(1, dtype=[
         ('C', 'f8'),
@@ -78,25 +91,26 @@ class BioSUR:
         """Initialize default values after dataclass initialization"""
         pass
 
-    def initialize(self, C: float = 0.0, H: float = 0.0, ASH: float = 0.0, MOIST: float = 0.0):
+    def initialize(self, C: float = 0.0, H: float = 0.0, N: float = 0.0, ASH: float = 0.0, MOIST: float = 0.0):
         """Initialize the composition values"""
-        if C + H > 1.0 + 1e-9:
+        if C + H + N > 1.0 + 1e-9:
             raise ValueError(
-                f"Invalid composition: C + H = {C + H:.4f} exceeds 1 "
+                f"Invalid composition: C + H + N = {C + H + N:.4f} exceeds 1 "
                 f"(oxygen by difference would be negative)"
             )
         self.input_composition['C'] = C
         self.input_composition['H'] = H
-        self.input_composition['O'] = 1.0 - C - H
+        self.input_composition['N'] = N
+        self.input_composition['O'] = 1.0 - C - H - N
         self.input_composition['ASH'] = ASH
         self.input_composition['MOIST'] = MOIST
         return self
 
     @classmethod
-    def create(cls, C: float = 0.0, H: float = 0.0, ASH: float = 0.0, MOIST: float = 0.0) -> 'BioSUR':
+    def create(cls, C: float = 0.0, H: float = 0.0, ASH: float = 0.0, MOIST: float = 0.0, N: float = 0.0) -> 'BioSUR':
         """Factory method to create and initialize a BioSUR instance"""
         instance = cls()
-        return instance.initialize(C, H, ASH, MOIST)
+        return instance.initialize(C, H, N, ASH, MOIST)
 
     @property
     def input_array(self) -> np.ndarray:
@@ -110,14 +124,19 @@ class BioSUR:
 
     @classmethod
     def from_composition_array(cls, values: np.ndarray) -> 'BioSUR':
-        """Create a BioSUR instance from an array of composition values"""
-        if len(values) != 5:
-            raise ValueError("Input array must have exactly 5 values")
+        """Create a BioSUR instance from an array of composition values
+
+        Expected order matches input_composition: (C, H, O, N, ASH, MOIST);
+        O is recomputed by difference, so its value here is ignored.
+        """
+        if len(values) != 6:
+            raise ValueError("Input array must have exactly 6 values")
         return cls.create(
             C=values[0],
             H=values[1],
-            ASH=values[3],
-            MOIST=values[4]
+            N=values[3],
+            ASH=values[4],
+            MOIST=values[5]
         )
 
     def to_dict(self) -> dict:
@@ -223,6 +242,46 @@ class BioSUR:
 
     def calculate_output_composition(self) -> 'BioSUR':
         """Calculate output composition"""
+        ref_species = REFERENCE_SPECIES
+
+        # Nitrogen handling: split off a protein fraction (N-rich case) or drop N
+        # by renormalizing C/H/O. Both paths make C+H+O sum to 1 as required by the
+        # linear solve. With N == 0 this block is skipped entirely, so the CHO-only
+        # behavior is unchanged.
+        prot_fraction = 0.0
+        if self.input_composition['N'] > 0:
+            if self.use_N_rich_characterization:
+                prot_fraction = self.calculate_protein_fraction()
+                if prot_fraction >= 1:
+                    raise ValueError(
+                        f"Nitrogen content ({self.input_composition['N']:.4f}) is too high "
+                        f"for N-rich characterization: the protein fraction reaches "
+                        f"{prot_fraction:.3f} (>= 1). The sample cannot be represented."
+                    )
+
+                # Remove the protein contribution from C/H and renormalize; O follows
+                # by difference (exact, since removing protein leaves C+H+O summing to 1).
+                for element in ('C', 'H'):
+                    prot_element = sum(
+                        self.protein_splitting_parameter[p] * ref_species[s][f'{element}_frac']
+                        for p, s in (('protc', 'PROTC'), ('proth', 'PROTH'), ('proto', 'PROTO'))
+                    )
+                    self.input_composition[element] = (
+                        (self.input_composition[element] - prot_fraction * prot_element)
+                        / (1 - prot_fraction)
+                    )
+                self.input_composition['O'] = 1 - self.input_composition['C'] - self.input_composition['H']
+            else:
+                if self.input_composition['N'] > 0.05:
+                    print("WARNING: The input composition contains a high nitrogen content. "
+                          "Consider enabling N-rich characterization for better results.")
+                # Ignore N: renormalize C/H over the non-N fraction, O by difference.
+                total_without_N = (self.input_composition['C'] + self.input_composition['H']
+                                   + self.input_composition['O'])
+                self.input_composition['C'] /= total_without_N
+                self.input_composition['H'] /= total_without_N
+                self.input_composition['O'] = 1 - self.input_composition['C'] - self.input_composition['H']
+
         self.calculate_splitting_parameters()
         self.calculate_ratio_ref_species()
         self.solve_linear_system()
@@ -236,10 +295,16 @@ class BioSUR:
             if species in self.RM3.composition:
                 out_comp[species] += self.RM3.composition[species] * self.RM3.fraction
 
-        ref_species = REFERENCE_SPECIES
         avg_MW = np.sum([value * ref_species[key]['MW'] for key, value in out_comp.items()])
 
         out_comp = {key: value * ref_species[key]['MW'] / avg_MW for key, value in out_comp.items()}
+
+        # Scale the CHO species down to make room for the protein fraction, then add
+        # the protein pseudo-species (already mass fractions of the whole DAF sample).
+        out_comp = {key: value * (1 - prot_fraction) for key, value in out_comp.items()}
+        out_comp['PROTC'] = prot_fraction * self.protein_splitting_parameter['protc']
+        out_comp['PROTH'] = prot_fraction * self.protein_splitting_parameter['proth']
+        out_comp['PROTO'] = prot_fraction * self.protein_splitting_parameter['proto']
 
         # Write results into the structured array in place so the output keeps a
         # consistent type (see output_array / to_dict, which rely on .dtype).
@@ -256,7 +321,44 @@ class BioSUR:
         """Enable or disable the extrapolation of the composition"""
         self.use_extrapolation = on
         return self
-    
+
+    def enable_N_rich_characterization(self, on: bool) -> 'BioSUR':
+        """Enable or disable the N-rich (protein) characterization.
+
+        When enabled, the protein is split equally between the three protein
+        reference species unless a custom split has been set.
+        """
+        self.use_N_rich_characterization = on
+        if on:
+            self.set_protein_splitting_parameter(1./3., 1./3., 1./3.)
+        return self
+
+    def set_protein_splitting_parameter(self, protc: float, proth: float, proto: float) -> 'BioSUR':
+        """Set how the protein fraction is split between PROTC, PROTH and PROTO.
+
+        The three values must sum to 1. Default (via enable_N_rich_characterization)
+        is 1/3 each, i.e. the protein is split equally.
+        """
+        if not math.isclose(protc + proth + proto, 1.0, rel_tol=1e-5):
+            raise ValueError("Protein splitting parameters must sum to 1")
+        self.protein_splitting_parameter['protc'] = protc
+        self.protein_splitting_parameter['proth'] = proth
+        self.protein_splitting_parameter['proto'] = proto
+        return self
+
+    def calculate_protein_fraction(self) -> float:
+        """Mass fraction of protein in the DAF sample implied by its nitrogen.
+
+        Chosen so the protein mixture contributes exactly the sample's nitrogen:
+        prot_fraction * (sum of split-weighted protein N fractions) == N.
+        """
+        ref_species = REFERENCE_SPECIES
+        prot_mix_N = (self.protein_splitting_parameter['protc'] * ref_species["PROTC"]["N_frac"]
+                      + self.protein_splitting_parameter['proth'] * ref_species["PROTH"]["N_frac"]
+                      + self.protein_splitting_parameter['proto'] * ref_species["PROTO"]["N_frac"])
+        return self.input_composition['N'] / prot_mix_N if prot_mix_N > 0 else 0.0
+
+
     def extrapolate_composition(self) -> np.ndarray:
         """Extrapolate the composition"""
         #check if the input composition in outside the triangle defined by the reference mixtures

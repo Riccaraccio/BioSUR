@@ -21,8 +21,10 @@ the CRECK kinetic scheme for biomass pyrolysis.
 ## Input
 
 - **C**, **H** — carbon and hydrogen mass fractions on a **Dry Ash Free (DAF)**
-  basis, wt (–). Oxygen is computed by difference so that `C + O + H = 1`
-  (therefore `C + H` must not exceed 1).
+  basis, wt (–). Oxygen is computed by difference so that `C + O + H + N = 1`.
+- **N** — nitrogen mass fraction (DAF), wt (–). *Optional*; leave at 0 for
+  nitrogen-free samples. Enable **N-rich composition** to characterize the
+  nitrogen as protein (see below).
 - **ASH**, **MOIST** — ash and moisture content, wt (–).
 - **Biomass type** — one of `Others`, `Grass`, `Hardwood`, `Softwood`.
 
@@ -39,11 +41,18 @@ as given):
 | Lignins          | `LIGO`, `LIGH`, `LIGC` |
 | Tannins          | `TANN` |
 | Triglycerides    | `TGL` |
+| Proteins         | `PROTC`, `PROTH`, `PROTO` (only with N-rich composition) |
 | Ash / Moisture   | `ASH`, `MOIST` |
 
 > **Note:** `Hardwood` and `Softwood` share the same fitted "Wood" correlation, so
 > their numeric output is identical — only the hemicellulose label differs
 > (`XYHW` vs `GMSW`).
+
+**N-rich composition.** When enabled (GUI toggle / `enable_N_rich_characterization`
+in the API), the nitrogen content is characterized as a protein fraction split
+between the three protein species `PROTC/PROTH/PROTO`; the remaining C/H/O is then
+characterized as usual. When disabled, nitrogen is ignored (C/H/O renormalized),
+and if `N > 5%` the GUI suggests turning the option on.
 
 Samples whose (C, H) fall outside the triangle defined by the three reference
 mixtures can optionally be **extrapolated** onto the triangle (see the
@@ -82,14 +91,17 @@ Besides the GUI, the characterization can be run directly from Python:
 ```python
 from BioSUR.core import BioSUR
 
-# Create a sample (C and H as DAF mass fractions)
-biosur = BioSUR.create(C=0.50, H=0.06, ASH=0.0, MOIST=0.0)
+# Create a sample (C, H and optional N as DAF mass fractions)
+biosur = BioSUR.create(C=0.50, H=0.06, N=0.0, ASH=0.0, MOIST=0.0)
 
 # Biomass type: 0 = Others, 1 = Grass, 2 = Hardwood, 3 = Softwood
 biosur.set_biomass_type(2)
 
 # Optional: extrapolate samples that fall outside the reference triangle
 biosur.enable_extrapolation(True)
+
+# Optional: characterize nitrogen as protein (PROTC/PROTH/PROTO)
+biosur.enable_N_rich_characterization(True)
 
 biosur.calculate_output_composition()
 print(biosur.output_composition)      # structured array of the components above

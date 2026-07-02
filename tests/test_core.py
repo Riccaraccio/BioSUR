@@ -57,3 +57,68 @@ def test_extrapolation_disabled_leaves_extrapolated_composition_untouched():
     ec = b.extrapolated_composition
     # Never computed -> stays at zero default.
     assert (float(ec["C"]), float(ec["H"]), float(ec["O"])) == (0.0, 0.0, 0.0)
+
+
+# --- Nitrogen / N-rich (protein) characterization ---------------------------
+
+def _out(b):
+    return {k: float(b.output_composition[k]) for k in b.output_composition.dtype.names}
+
+# Protein mixture nitrogen content for the default 1/3 split (sum of split*N_frac).
+PROT_MIX_N = (0.131 + 0.130 + 0.130) / 3.0
+
+
+def test_nitrogen_zero_leaves_protein_at_zero():
+    """N == 0 must not touch the CHO result and must leave all PROT species at 0."""
+    b = _make(C=0.53, H=0.06)
+    o = _out(b)
+    assert o["PROTC"] == 0.0 and o["PROTH"] == 0.0 and o["PROTO"] == 0.0
+
+
+def test_n_rich_mass_balance_and_protein_fraction():
+    b = BioSUR.create(C=0.52, H=0.06, N=0.03, ASH=0.05, MOIST=0.10)
+    b.set_biomass_type(BiomassType.GRASS).enable_N_rich_characterization(True)
+    b.calculate_output_composition()
+    o = _out(b)
+    prot = o["PROTC"] + o["PROTH"] + o["PROTO"]
+    organics = sum(v for k, v in o.items() if k not in ("ASH", "MOIST"))
+    # Everything (incl. protein) sums to the solid fraction.
+    assert math.isclose(organics, 1 - 0.05 - 0.10, rel_tol=1e-9, abs_tol=1e-9)
+    # Protein fraction (of the DAF sample) matches N / protein-mix nitrogen.
+    expected_prot = 0.03 / PROT_MIX_N * (1 - 0.05 - 0.10)
+    assert math.isclose(prot, expected_prot, rel_tol=1e-3)
+    assert prot > 0
+
+
+def test_n_rich_inside_triangle_has_no_negative_output():
+    b = BioSUR.create(C=0.52, H=0.06, N=0.03)
+    b.set_biomass_type(BiomassType.GRASS).enable_N_rich_characterization(True)
+    b.calculate_output_composition()
+    assert all(v >= -1e-12 for v in _out(b).values())
+
+
+def test_c_h_n_over_one_raises():
+    with pytest.raises(ValueError):
+        BioSUR.create(C=0.6, H=0.3, N=0.2)
+
+
+def test_enable_n_rich_sets_equal_split():
+    b = BioSUR.create(C=0.5, H=0.06).enable_N_rich_characterization(True)
+    p = b.protein_splitting_parameter
+    assert math.isclose(float(p["protc"]), 1 / 3, rel_tol=1e-9)
+    assert math.isclose(float(p["proth"]), 1 / 3, rel_tol=1e-9)
+    assert math.isclose(float(p["proto"]), 1 / 3, rel_tol=1e-9)
+
+
+def test_protein_split_must_sum_to_one():
+    b = BioSUR.create(C=0.5, H=0.06)
+    with pytest.raises(ValueError):
+        b.set_protein_splitting_parameter(0.5, 0.5, 0.5)
+
+
+def test_excessive_nitrogen_triggers_protein_fraction_guard():
+    """N at/above the protein's own nitrogen content is unrepresentable."""
+    b = BioSUR.create(C=0.40, H=0.06, N=0.14)
+    b.set_biomass_type(BiomassType.GRASS).enable_N_rich_characterization(True)
+    with pytest.raises(ValueError):
+        b.calculate_output_composition()

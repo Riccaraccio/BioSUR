@@ -44,8 +44,8 @@ class InputElement(customtkinter.CTkFrame):
         self.entry.grid(row=0, column=1, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="nswe")
     
     def _handle_key_release(self, event) -> None:
-        """Handle key release event for C and H fields."""
-        if self.label.cget("text") in ["C", "H"]:
+        """Handle key release event for C, H and N fields."""
+        if self.label.cget("text") in ["C", "H", "N"]:
             self.input_frame.calculate_and_update_O()
         
         parent = self.winfo_toplevel()
@@ -84,8 +84,8 @@ class ElementalCompositionInputFrame(customtkinter.CTkFrame):
     def __init__(self, master: customtkinter.CTkFrame):
         """Initialize the elemental composition frame."""
         super().__init__(master, fg_color=AppConfig.COLORS["BACKGROUND"])
-        self.grid_columnconfigure((0, 1), weight=1)
-        
+        self.grid_columnconfigure((0, 1, 2, 3), weight=1)
+
         self._title_text = "Elemental composition DAF wt."
         self.title_label = customtkinter.CTkLabel(
             self,
@@ -95,7 +95,7 @@ class ElementalCompositionInputFrame(customtkinter.CTkFrame):
             corner_radius=AppConfig.CORNER_RADIUS,
             font=AppConfig.FONTS["HEADER"]
         )
-        self.title_label.grid(row=0, column=0, padx=AppConfig.PADDING, pady=(AppConfig.PADDING, 0), sticky="new", columnspan=3)
+        self.title_label.grid(row=0, column=0, padx=AppConfig.PADDING, pady=(AppConfig.PADDING, 0), sticky="new", columnspan=4)
 
         self.C = InputElement(self, "C")
         self.C.grid(row=1, column=0, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="new")
@@ -103,33 +103,40 @@ class ElementalCompositionInputFrame(customtkinter.CTkFrame):
         self.H = InputElement(self, "H")
         self.H.grid(row=1, column=1, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="new")
 
+        # N is optional; leave it blank/0 unless the sample is nitrogen-bearing.
+        self.N = InputElement(self, "N")
+        self.N.grid(row=1, column=2, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="new")
+
         self.O = InputElement(self, "O")
         self.calculate_and_update_O()
-        self.O.grid(row=1, column=2, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="new")
+        self.O.grid(row=1, column=3, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="new")
 
     def calculate_and_update_O(self) -> None:
-        """Calculate and update the O value based on C and H inputs."""
+        """Calculate and update the O value based on C, H and N inputs."""
         try:
             c_value = self.C.get_value()
             h_value = self.H.get_value()
-            
-            if c_value + h_value > 1:
+            n_value = self.N.get_value()
+
+            if c_value + h_value + n_value > 1:
                 result = 0
             else:
-                result = 1 - c_value - h_value
-            
+                result = 1 - c_value - h_value - n_value
+
             self.O.set_value(result)
         except ValueError:
             self.O.set_value(0)
-    
+
     def get_values(self) -> dict:
         """Get all values from the frame."""
-        return {"C": self.C.get_value(), "H": self.H.get_value(), "O": self.O.get_value()}
-    
+        return {"C": self.C.get_value(), "H": self.H.get_value(),
+                "N": self.N.get_value(), "O": self.O.get_value()}
+
     def set_values(self, values: dict) -> None:
         """Set values for all fields in the frame."""
         self.C.set_value(values.get("C", 0))
         self.H.set_value(values.get("H", 0))
+        self.N.set_value(values.get("N", 0))
         self.calculate_and_update_O()
 
 class MoistureAshInputFrame(customtkinter.CTkFrame):
@@ -208,6 +215,19 @@ class InputFrame(customtkinter.CTkFrame):
         self.extrapolation_switch.deselect()  # default: off
         self.extrapolation_switch.grid(row=0, column=1, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="e")
 
+        # N-rich toggle: enable protein (PROT) characterization from the N content.
+        self.n_rich_switch = customtkinter.CTkSwitch(
+            self.header,
+            text="N-rich composition",
+            command=self._handle_biomass_type_change,
+            progress_color=AppConfig.COLORS["PRIMARY_BUTTON"],
+            button_hover_color=AppConfig.COLORS["BUTTON_HOVER"],
+            text_color=AppConfig.COLORS["PRIMARY_TEXT"],
+            font=AppConfig.FONTS["DEFAULT"]
+        )
+        self.n_rich_switch.deselect()  # default: off
+        self.n_rich_switch.grid(row=0, column=2, padx=(0, AppConfig.PADDING), pady=AppConfig.PADDING, sticky="e")
+
         # Create frames container
         self.frames_container = customtkinter.CTkFrame(self, fg_color=AppConfig.COLORS["BACKGROUND"])
         self.frames_container.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=AppConfig.PADDING, pady=AppConfig.PADDING)
@@ -280,6 +300,10 @@ class InputFrame(customtkinter.CTkFrame):
     def get_extrapolation(self) -> bool:
         """Get whether the extrapolation toggle is enabled."""
         return bool(self.extrapolation_switch.get())
+
+    def get_n_rich(self) -> bool:
+        """Get whether the N-rich composition toggle is enabled."""
+        return bool(self.n_rich_switch.get())
 
     def _handle_biomass_type_change(self, choice=None) -> None:
         """Trigger a recompute when an input control changes.

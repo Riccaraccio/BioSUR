@@ -32,10 +32,11 @@ def create_triangle_plot(biosur: BioSUR):
                          label="Reference Mixtures", color='blue', marker='o', s=100)
     plot_elements['rm_points'] = rm_points
 
-    # Plot reference species (these are static)
-    ref_points = []
-    ref_points = ax.scatter([ref_species[species]['C_frac'] for species in ref_species.characteristics['name']],
-                          [ref_species[species]['H_frac'] for species in ref_species.characteristics['name']],
+    # Plot reference species (these are static). Protein species are excluded:
+    # they are not part of the C/H characterization triangle.
+    cho_species = [s for s in ref_species.characteristics['name'] if not s.startswith('PROT')]
+    ref_points = ax.scatter([ref_species[species]['C_frac'] for species in cho_species],
+                          [ref_species[species]['H_frac'] for species in cho_species],
                           color='green', marker='s', label='Reference Species')
     plot_elements['ref_species_points'] = ref_points
 

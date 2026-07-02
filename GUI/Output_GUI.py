@@ -52,6 +52,13 @@ class OutputFrame(customtkinter.CTkFrame):
         )
         self.output_text.configure(state="disabled")
 
+    # Base textbox height fits the standard set of rows; extra rows (e.g. the
+    # protein species shown when N-rich is active) grow the box so nothing is
+    # hidden behind the scrollbar.
+    BASE_HEIGHT = 160
+    BASE_ROWS = 9
+    ROW_HEIGHT = 18
+
     def print_output_composition(self, output_composition, biomass_type) -> None:
         """Print the output composition to the output text box.
 
@@ -66,8 +73,15 @@ class OutputFrame(customtkinter.CTkFrame):
         else:  # structured numpy array
             items = [(k, float(output_composition[k])) for k in output_composition.dtype.names]
 
-        # Insert new values with proper formatting
+        # Build the rows to display (hiding zero-valued protein species and
+        # applying the biomass-dependent hemicellulose label).
+        rows = []
         for key, value in items:
+            # Protein species are only relevant for N-rich samples; hide them when
+            # they are zero to keep the panel uncluttered for normal biomass.
+            if key.startswith("PROT") and value == 0:
+                continue
+
             # Change key depending on biomass type
             if key == "HCELL":
                 if biomass_type == BiomassType.HARDWOOD:
@@ -77,10 +91,15 @@ class OutputFrame(customtkinter.CTkFrame):
                 else:  # BiomassType.OTHERS and BiomassType.GRASS
                     key = "XYGR"
 
-            formatted_value = f"{value:.4f}"
-            # Add padding to keys for better alignment
-            padded_key = f"{key:<6}"  # Left-align with minimum 6 characters
-            self.output_text.insert("end", f"{padded_key} {formatted_value}\n")
+            # Add padding to keys for better alignment (left-align, min 6 chars)
+            rows.append(f"{key:<6} {value:.4f}")
+
+        # Grow the box to fit any rows beyond the standard set, so N-rich output
+        # is fully visible without scrolling.
+        extra_rows = max(0, len(rows) - self.BASE_ROWS)
+        self.output_text.configure(height=self.BASE_HEIGHT + extra_rows * self.ROW_HEIGHT)
+
+        self.output_text.insert("end", "\n".join(rows) + "\n")
 
         self.output_text.configure(state="disabled")
     
