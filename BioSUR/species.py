@@ -28,10 +28,13 @@ class ReferenceSpecies:
         mask = self.characteristics['name'] == key
         if not np.any(mask):
             raise KeyError(f"Species '{key}' not found")
-        return {name: self.characteristics[mask][0][i] 
+        return {name: self.characteristics[mask][0][i]
                 for i, name in enumerate(self.characteristics.dtype.names)}
-    
-@dataclass
+
+# Shared singleton: the reference-species table is constant, so build it once
+# instead of reconstructing the structured array on every use.
+REFERENCE_SPECIES = ReferenceSpecies()
+
 class ReferenceMixture:
     __slots__ = ['C', 'H', 'O', 'MW', 'C_frac', 'H_frac', 'O_frac', 'composition', 'fraction']
     
@@ -66,7 +69,7 @@ class ReferenceMixture:
         return self.MW
 
     def mix_species(self, species_weights: Dict[str, float]) -> None:
-        ref_species = ReferenceSpecies()
+        ref_species = REFERENCE_SPECIES
         self.composition = species_weights.copy() # Save the composition
         self.C = sum(w * ref_species[name]['C'] for name, w in species_weights.items())
         self.H = sum(w * ref_species[name]['H'] for name, w in species_weights.items())
@@ -82,6 +85,7 @@ class ReferenceMixture:
         instance.C = C_frac * 100
         instance.H = H_frac * 100
         instance.O = O_frac * 100
+        instance.calculate_fractions()
         return instance
 
     def to_dict(self) -> Dict[str, float]:

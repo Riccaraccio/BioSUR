@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import numpy as np
 from enum import IntEnum
-from BioSUR.species import ReferenceSpecies, ReferenceMixture
+from BioSUR.species import ReferenceMixture, REFERENCE_SPECIES
 import math
 
 class BiomassType(IntEnum):
@@ -80,6 +80,11 @@ class BioSUR:
 
     def initialize(self, C: float = 0.0, H: float = 0.0, ASH: float = 0.0, MOIST: float = 0.0):
         """Initialize the composition values"""
+        if C + H > 1.0 + 1e-9:
+            raise ValueError(
+                f"Invalid composition: C + H = {C + H:.4f} exceeds 1 "
+                f"(oxygen by difference would be negative)"
+            )
         self.input_composition['C'] = C
         self.input_composition['H'] = H
         self.input_composition['O'] = 1.0 - C - H
@@ -231,15 +236,20 @@ class BioSUR:
             if species in self.RM3.composition:
                 out_comp[species] += self.RM3.composition[species] * self.RM3.fraction
 
-        ref_species = ReferenceSpecies()
+        ref_species = REFERENCE_SPECIES
         avg_MW = np.sum([value * ref_species[key]['MW'] for key, value in out_comp.items()])
 
         out_comp = {key: value * ref_species[key]['MW'] / avg_MW for key, value in out_comp.items()}
-        
-        self.output_composition = {key: out_comp[key] * (1 - self.input_composition["ASH"] - self.input_composition["MOIST"])
-                                   if key not in ["ASH", "MOIST"] else self.input_composition[key]
-                                   for key in self.output_composition.dtype.names}
-        
+
+        # Write results into the structured array in place so the output keeps a
+        # consistent type (see output_array / to_dict, which rely on .dtype).
+        solid_fraction = 1 - self.input_composition["ASH"] - self.input_composition["MOIST"]
+        for key in self.output_composition.dtype.names:
+            if key in ("ASH", "MOIST"):
+                self.output_composition[key] = self.input_composition[key]
+            else:
+                self.output_composition[key] = out_comp[key] * solid_fraction
+
         return self
     
     def enable_extrapolation(self, on:bool) -> 'BioSUR':
@@ -278,22 +288,22 @@ class BioSUR:
             self.calculate_splitting_parameters()
             self.calculate_ratio_ref_species()
 
-        # Create point and vertices arrays
+        # Create point and vertices arrays (V1, V2, V3 are the RM triangle corners)
         P = [C, H]
-        A = [self.RM1.C_frac, self.RM1.H_frac]
-        B = [self.RM2.C_frac, self.RM2.H_frac]
-        C = [self.RM3.C_frac, self.RM3.H_frac]
+        V1 = [self.RM1.C_frac, self.RM1.H_frac]
+        V2 = [self.RM2.C_frac, self.RM2.H_frac]
+        V3 = [self.RM3.C_frac, self.RM3.H_frac]
 
         # Calculate barycentric coordinates
-        area = 0.5 * (A[0]*(B[1] - C[1]) + B[0]*(C[1] - A[1]) + C[0]*(A[1] - B[1]))
-        
+        area = 0.5 * (V1[0]*(V2[1] - V3[1]) + V2[0]*(V3[1] - V1[1]) + V3[0]*(V1[1] - V2[1]))
+
         # Calculate first coordinate
-        coord1 = (P[0]*(B[1] - C[1]) + B[0]*(C[1] - P[1]) + C[0]*(P[1] - B[1])) / (2*area)
-        
-        # Calculate second coordinate  
-        coord2 = (A[0]*(P[1] - C[1]) + P[0]*(C[1] - A[1]) + C[0]*(A[1] - P[1])) / (2*area)
-        
+        coord1 = (P[0]*(V2[1] - V3[1]) + V2[0]*(V3[1] - P[1]) + V3[0]*(P[1] - V2[1])) / (2*area)
+
+        # Calculate second coordinate
+        coord2 = (V1[0]*(P[1] - V3[1]) + P[0]*(V3[1] - V1[1]) + V3[0]*(V1[1] - P[1])) / (2*area)
+
         # Calculate third coordinate
         coord3 = 1 - coord1 - coord2
-        
+
         return coord1 < 0 or coord2 < 0 or coord3 < 0
