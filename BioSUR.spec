@@ -7,7 +7,7 @@
 # bundled theme/asset files, which PyInstaller does not detect automatically.
 import sys
 
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 # Application resources referenced at runtime via GUI.main_GUI.resource_path.
 datas = [
@@ -16,6 +16,12 @@ datas = [
 ]
 binaries = []
 hiddenimports = ["matplotlib.backends.backend_tkagg"]
+
+# Explicitly collect every submodule of the app packages so none are missed by
+# the dependency analysis (the BioSUR package shares its name with the
+# BioSUR.BioSUR module, which can confuse module resolution).
+hiddenimports += collect_submodules("BioSUR")
+hiddenimports += collect_submodules("GUI")
 
 # customtkinter ships JSON themes and image assets that must be bundled.
 for _pkg in ("customtkinter",):
