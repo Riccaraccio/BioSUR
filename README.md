@@ -12,22 +12,91 @@
  \/_____________/\/_________/\/_________/   \_____\/     \/_________/ \/_/    \_\/    
 ```
 
-The purpose of this repo is to automatize and refactor the  CRECK characterization method for biomasses.
+# BioSUR
 
-The codes takes as input the elemental composition of a biomass sample in terms of Carbon (C) and Hydrogen (H) in Dry Ash Free (D.A.F) basis wt (-). Oxygen (O) content is calculated by difference, such that C + O + H = 1. 
+BioSUR automates the CRECK biomass characterization method: it converts a
+biomass sample's elemental analysis into the pseudo-component composition used by
+the CRECK kinetic scheme for biomass pyrolysis.
 
-Further input parameters are the content of ashes (ASH) and humidity (MOIST) wt (-).
-You also need to specify the kind of biomass you ara analyizing, possible options are:  
-+ Other
-+ Grass
-+ Hardwood
-+ Softwood
+## Input
 
-The code then returns the composition in terms of the component taken  as input in the CRECK kinetick scheme for biomasses. These include:
+- **C**, **H** — carbon and hydrogen mass fractions on a **Dry Ash Free (DAF)**
+  basis, wt (–). Oxygen is computed by difference so that `C + O + H = 1`
+  (therefore `C + H` must not exceed 1).
+- **ASH**, **MOIST** — ash and moisture content, wt (–).
+- **Biomass type** — one of `Others`, `Grass`, `Hardwood`, `Softwood`.
 
-+ Cellulose: CELL
-+ Lignin: LIGO, LIGC and LIGH
-+ Hemicellulose: XYGR or XYHW or GMSW, chosen based on the type of biomass
+## Output
 
-See the following publication for more informations:
-    TODO
+The sample is expressed as a mixture of the reference species of the CRECK
+scheme (mass fractions, scaled by `1 − ASH − MOIST`, with ASH and MOIST reported
+as given):
+
+| Component        | Species |
+| ---------------- | ------- |
+| Cellulose        | `CELL` |
+| Hemicellulose    | `HCELL` — displayed as `XYGR` (Others/Grass), `XYHW` (Hardwood) or `GMSW` (Softwood) |
+| Lignins          | `LIGO`, `LIGH`, `LIGC` |
+| Tannins          | `TANN` |
+| Triglycerides    | `TGL` |
+| Ash / Moisture   | `ASH`, `MOIST` |
+
+> **Note:** `Hardwood` and `Softwood` share the same fitted "Wood" correlation, so
+> their numeric output is identical — only the hemicellulose label differs
+> (`XYHW` vs `GMSW`).
+
+Samples whose (C, H) fall outside the triangle defined by the three reference
+mixtures can optionally be **extrapolated** onto the triangle (see the
+extrapolation toggle in the GUI / `enable_extrapolation` in the API).
+
+## Installation
+
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+### GUI
+
+```bash
+python main.py
+```
+
+### Programmatic
+
+```python
+from BioSUR.BioSUR import BioSUR
+
+# Create a sample (C and H as DAF mass fractions)
+biosur = BioSUR.create(C=0.50, H=0.06, ASH=0.0, MOIST=0.0)
+
+# Biomass type: 0 = Others, 1 = Grass, 2 = Hardwood, 3 = Softwood
+biosur.set_biomass_type(2)
+
+# Optional: extrapolate samples that fall outside the reference triangle
+biosur.enable_extrapolation(True)
+
+biosur.calculate_output_composition()
+print(biosur.output_composition)      # structured array of the components above
+
+# Optional: draw the Van Krevelen characterization triangle
+import matplotlib.pyplot as plt
+from BioSUR.plot import create_triangle_plot
+fig, ax, elements = create_triangle_plot(biosur)
+plt.show()
+```
+
+## Tests
+
+```bash
+pytest
+```
+
+The suite includes a golden-value regression that pins the numeric output of the
+core algorithm (see `tests/README.md`).
+
+## Reference
+
+<!-- TODO: fill in citation -->
+> _Publication citation to be added._
