@@ -1,11 +1,11 @@
-from BioSUR.species import ReferenceSpecies
+from BioSUR.species import REFERENCE_SPECIES
 from BioSUR.BioSUR import BioSUR
 from matplotlib import pyplot as plt
 
 def create_triangle_plot(biosur: BioSUR):
     """Creates the initial plot with all static elements"""
     fig, ax = plt.subplots()
-    ref_species = ReferenceSpecies()
+    ref_species = REFERENCE_SPECIES
     
     # Set up axes
     ax.set_xlabel('C fraction [-]')
@@ -82,28 +82,37 @@ def create_triangle_plot(biosur: BioSUR):
                         marker='x', s=100)
     plot_elements['biomass_point'] = biomass
 
-    # Add extrapolated point and line
-    if biosur.enable_extrapolation and biosur.is_outside_triangle(biosur.input_composition["C"], biosur.input_composition["H"]):
-        # Extrapolated point
-        extrap_point = ax.scatter(biosur.extrapolated_composition["C"], 
-                                  biosur.extrapolated_composition["H"], 
-                                  label='Extrapolated', color='orange', 
-                                  marker='x', s=100)
-        plot_elements['extrap_point'] = extrap_point
-
-        # Extrapolated line
-        line, = ax.plot([biosur.input_composition["C"], biosur.extrapolated_composition["C"]], 
-                        [biosur.input_composition["H"], biosur.extrapolated_composition["H"]], 
-                        color='orange', linestyle='--')
-        plot_elements['extrap_line'] = line
+    # Extrapolated point and line. Always created so the elements persist across
+    # updates (e.g. when the extrapolation toggle changes); shown only when the
+    # sample is outside the triangle and extrapolation is enabled.
+    plot_elements['ax'] = ax
+    show_extrap = biosur.use_extrapolation and biosur.is_outside_triangle(
+        biosur.input_composition["C"], biosur.input_composition["H"])
+    extrap_point = ax.scatter(biosur.extrapolated_composition["C"],
+                              biosur.extrapolated_composition["H"],
+                              color='orange', marker='x', s=100)
+    extrap_line, = ax.plot([biosur.input_composition["C"], biosur.extrapolated_composition["C"]],
+                           [biosur.input_composition["H"], biosur.extrapolated_composition["H"]],
+                           color='orange', linestyle='--')
+    plot_elements['extrap_point'] = extrap_point
+    plot_elements['extrap_line'] = extrap_line
+    _set_extrap_visibility(plot_elements, show_extrap)
 
     ax.legend(loc="upper left", fontsize='small', frameon=True, edgecolor='black')
-    
+
     return fig, ax, plot_elements
+
+
+def _set_extrap_visibility(plot_elements, show: bool) -> None:
+    """Show/hide the extrapolation artifacts and keep the legend entry in sync."""
+    plot_elements['extrap_point'].set_visible(show)
+    plot_elements['extrap_line'].set_visible(show)
+    # Only the point carries the legend label; hide it from the legend when off.
+    plot_elements['extrap_point'].set_label('Extrapolated' if show else '_nolegend_')
 
 def update_triangle_plot(biosur: BioSUR, plot_elements):
     """Updates the dynamic elements of the plot"""
-    ref_species = ReferenceSpecies()
+    ref_species = REFERENCE_SPECIES
     
     # Update triangle lines
     plot_elements['triangle_lines'][0].set_data(
@@ -154,12 +163,15 @@ def update_triangle_plot(biosur: BioSUR, plot_elements):
     plot_elements['biomass_point'].set_offsets([[biosur.input_composition['C'],
                                                biosur.input_composition['H']]])
  
-    # Update extrapolated point and line
-    if biosur.enable_extrapolation and biosur.is_outside_triangle(biosur.input_composition["C"], biosur.input_composition["H"]):
-        # Extrapolated point
+    # Update extrapolated point and line, toggling visibility to match state.
+    show_extrap = biosur.use_extrapolation and biosur.is_outside_triangle(
+        biosur.input_composition["C"], biosur.input_composition["H"])
+    if show_extrap:
         plot_elements['extrap_point'].set_offsets([[biosur.extrapolated_composition["C"],
-                                                  biosur.extrapolated_composition["H"]]])
-        
-        # Extrapolated line
-        plot_elements['extrap_line'].set_data([biosur.input_composition["C"], biosur.extrapolated_composition["C"]],
-                                            [biosur.input_composition["H"], biosur.extrapolated_composition["H"]])
+                                                    biosur.extrapolated_composition["H"]]])
+        plot_elements['extrap_line'].set_data(
+            [biosur.input_composition["C"], biosur.extrapolated_composition["C"]],
+            [biosur.input_composition["H"], biosur.extrapolated_composition["H"]])
+    _set_extrap_visibility(plot_elements, show_extrap)
+    if 'ax' in plot_elements:
+        plot_elements['ax'].legend(loc="upper left", fontsize='small', frameon=True, edgecolor='black')

@@ -52,14 +52,22 @@ class OutputFrame(customtkinter.CTkFrame):
         )
         self.output_text.configure(state="disabled")
 
-    def print_output_composition(self, output_composition: dict, biomass_type) -> None:
-        """Print the output composition to the output text box."""
+    def print_output_composition(self, output_composition, biomass_type) -> None:
+        """Print the output composition to the output text box.
+
+        Accepts either the structured-array composition or a plain dict.
+        """
         self.output_text.configure(state="normal")
         # Clear previous content
         self.output_text.delete("0.0", "end")
-        
+
+        if hasattr(output_composition, "items"):
+            items = [(k, float(v)) for k, v in output_composition.items()]
+        else:  # structured numpy array
+            items = [(k, float(output_composition[k])) for k in output_composition.dtype.names]
+
         # Insert new values with proper formatting
-        for key, value in output_composition.items():
+        for key, value in items:
             # Change key depending on biomass type
             if key == "HCELL":
                 if biomass_type == BiomassType.HARDWOOD:
@@ -69,7 +77,7 @@ class OutputFrame(customtkinter.CTkFrame):
                 else:  # BiomassType.OTHERS and BiomassType.GRASS
                     key = "XYGR"
 
-            formatted_value = f"{value:.4f}" if isinstance(value, float) else str(value)
+            formatted_value = f"{value:.4f}"
             # Add padding to keys for better alignment
             padded_key = f"{key:<6}"  # Left-align with minimum 6 characters
             self.output_text.insert("end", f"{padded_key} {formatted_value}\n")
