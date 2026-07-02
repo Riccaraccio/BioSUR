@@ -175,15 +175,38 @@ class InputFrame(customtkinter.CTkFrame):
         self.grid_columnconfigure((0, 1), weight=1)
         
         self._title_text = "INPUT"
-        self.title_label = customtkinter.CTkLabel(
+        # Header bar: title on the left, extrapolation toggle on the right.
+        self.header = customtkinter.CTkFrame(
             self,
-            text=self._title_text,
             fg_color=AppConfig.COLORS["HEADER_BACKGROUND"],
+            corner_radius=AppConfig.CORNER_RADIUS
+        )
+        self.header.grid(row=0, column=0, columnspan=2, padx=AppConfig.PADDING,
+                         pady=(AppConfig.PADDING, 0), sticky="new")
+        self.header.grid_columnconfigure(0, weight=1)
+
+        self.title_label = customtkinter.CTkLabel(
+            self.header,
+            text=self._title_text,
+            fg_color="transparent",
             text_color=AppConfig.COLORS["HEADER_TEXT"],
-            corner_radius=AppConfig.CORNER_RADIUS,
             font=AppConfig.FONTS["HEADER"]
         )
-        self.title_label.grid(row=0, column=0, padx=AppConfig.PADDING, pady=(AppConfig.PADDING, 0), sticky="new", columnspan=2)
+        self.title_label.grid(row=0, column=0, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="w")
+
+        # Extrapolation toggle: enable/disable composition extrapolation for
+        # samples that fall outside the reference-mixture triangle.
+        self.extrapolation_switch = customtkinter.CTkSwitch(
+            self.header,
+            text="Extrapolation",
+            command=self._handle_biomass_type_change,
+            progress_color=AppConfig.COLORS["PRIMARY_BUTTON"],
+            button_hover_color=AppConfig.COLORS["BUTTON_HOVER"],
+            text_color=AppConfig.COLORS["PRIMARY_TEXT"],
+            font=AppConfig.FONTS["DEFAULT"]
+        )
+        self.extrapolation_switch.deselect()  # default: off
+        self.extrapolation_switch.grid(row=0, column=1, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="e")
 
         # Create frames container
         self.frames_container = customtkinter.CTkFrame(self, fg_color=AppConfig.COLORS["BACKGROUND"])
@@ -236,20 +259,6 @@ class InputFrame(customtkinter.CTkFrame):
         )
         self.biomass_type.set("Hardwood")
         self.biomass_type.pack(padx=AppConfig.PADDING, pady=AppConfig.PADDING)
-
-        # Extrapolation toggle: enable/disable composition extrapolation for
-        # samples that fall outside the reference-mixture triangle.
-        self.extrapolation_switch = customtkinter.CTkSwitch(
-            self.combo_container,
-            text="Extrapolation",
-            command=self._handle_biomass_type_change,
-            progress_color=AppConfig.COLORS["PRIMARY_BUTTON"],
-            button_hover_color=AppConfig.COLORS["BUTTON_HOVER"],
-            text_color=AppConfig.COLORS["PRIMARY_TEXT"],
-            font=AppConfig.FONTS["DEFAULT"]
-        )
-        self.extrapolation_switch.deselect()  # default: off
-        self.extrapolation_switch.pack(padx=AppConfig.PADDING, pady=(0, AppConfig.PADDING))
 
     def get_all_values(self) -> dict:
         """Get all values from all input fields."""
