@@ -49,21 +49,35 @@ Samples whose (C, H) fall outside the triangle defined by the three reference
 mixtures can optionally be **extrapolated** onto the triangle (see the
 extrapolation toggle in the GUI / `enable_extrapolation` in the API).
 
-## Installation
+## Download & install
+
+Pre-built applications are available on the [**Releases page**](../../releases) —
+no Python or setup required. Download the file for your operating system and open
+it like any other app.
+
+- **Windows** — download `BioSUR-windows.exe` and double-click it. The first time,
+  Windows may show a blue *"Windows protected your PC"* box; click **More info →
+  Run anyway** (this appears because the app is not code-signed).
+- **macOS** — download `BioSUR-macos.zip`, unzip it, and drag **BioSUR** into your
+  Applications folder. The first launch, **right-click (or Control-click) the app →
+  Open → Open** to get past the *"unidentified developer"* warning; afterwards it
+  opens normally.
+- **Linux** — download `BioSUR-linux`, mark it executable (`chmod +x BioSUR-linux`,
+  or right-click → *Properties → Permissions → Allow executing file as program*),
+  then run it.
+
+## Running from source
+
+For development, or to run without a pre-built binary:
 
 ```bash
 pip install -r requirements.txt
-```
-
-## Usage
-
-### GUI
-
-```bash
 python main.py
 ```
 
-### Programmatic
+## Programmatic usage
+
+Besides the GUI, the characterization can be run directly from Python:
 
 ```python
 from BioSUR.BioSUR import BioSUR
