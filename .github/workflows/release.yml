@@ -1,0 +1,79 @@
+name: Build & Release
+
+# Build standalone desktop binaries for Windows, macOS and Linux.
+# - On every push of a version tag (e.g. v1.0.0) the binaries are attached to a
+#   GitHub Release for users to download.
+# - Can also be run manually (Actions tab -> Run workflow) to produce downloadable
+#   build artifacts without creating a release, e.g. for testing.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # required to create/update the Release
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Tk (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y python3-tk
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Build with PyInstaller
+        run: pyinstaller BioSUR.spec --noconfirm
+
+      - name: Package artifact
+        shell: bash
+        run: |
+          mkdir -p out
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp dist/BioSUR.exe "out/BioSUR-windows.exe"
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            # ditto produces a Finder-compatible zip of the .app bundle
+            ditto -c -k --keepParent dist/BioSUR.app "out/BioSUR-macos.zip"
+          else
+            cp dist/BioSUR "out/BioSUR-linux"
+            chmod +x "out/BioSUR-linux"
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BioSUR-${{ runner.os }}
+          path: out/*
+          if-no-files-found: error
+
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          fail_on_unmatched_files: true

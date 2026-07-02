@@ -2,8 +2,9 @@
 **/build/
 **/dist/
 
-# PyInstaller
+# PyInstaller (ignore auto-generated specs, but keep our maintained one)
 *.spec
+!BioSUR.spec
 
 # Virtual environments
 .venv/
