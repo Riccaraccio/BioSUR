@@ -140,7 +140,16 @@ pytest
 The suite includes a golden-value regression that pins the numeric output of the
 core algorithm (see `tests/README.md`).
 
-## Reference
-
-<!-- TODO: fill in citation -->
-> _Publication citation to be added._
+## References
+1. Caraccio, R.; Cipriano, E.; Frassoldati, A.; Faravelli, T. Multiphase Modeling
+   of Anisotropic Biomass Particle Pyrolysis Accounting for Particle Deformation
+   and Coupled Gas-Phase Dynamics. *Chemical Engineering Journal* **2026**, *531*,
+   174297. https://doi.org/10.1016/j.cej.2026.174297
+2. Debiagi, P. E. A.; Pecchi, C.; Gentile, G.; Frassoldati, A.; Cuoci, A.;
+   Faravelli, T.; Ranzi, E. Extractives Extend the Applicability of Multistep
+   Kinetic Scheme of Biomass Pyrolysis. *Energy & Fuels* **2015**, *29* (10),
+   6544–6555. https://doi.org/10.1021/acs.energyfuels.5b01753
+3. Ranzi, E.; Debiagi, P. E. A.; Frassoldati, A. Mathematical Modeling of Fast
+   Biomass Pyrolysis and Bio-Oil Formation. Note I: Kinetic Mechanism of Biomass
+   Pyrolysis. *ACS Sustainable Chemistry & Engineering* **2017**, *5* (4),
+   2867–2881. https://doi.org/10.1021/acssuschemeng.6b03096
