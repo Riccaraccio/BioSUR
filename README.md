@@ -54,9 +54,24 @@ between the three protein species `PROTC/PROTH/PROTO`; the remaining C/H/O is th
 characterized as usual. When disabled, nitrogen is ignored (C/H/O renormalized),
 and if `N > 5%` the GUI suggests turning the option on.
 
-Samples whose (C, H) fall outside the triangle defined by the three reference
-mixtures can optionally be **extrapolated** onto the triangle (see the
-extrapolation toggle in the GUI / `enable_extrapolation` in the API).
+**Extrapolation.** Samples whose (C, H) fall outside the triangle defined by the
+three reference mixtures can optionally be **extrapolated** (GUI switch /
+`enable_extrapolation`). The method is selectable (GUI dropdown /
+`set_extrapolation_method`):
+
+- **Centroid** *(default)* — march the sample toward the triangle centroid until it
+  lands inside. Kept as the default for backward compatibility.
+- **Nearest point** — project the sample onto the closest point of the triangle
+  boundary; the minimum-distortion correction to the measured (C, H).
+- **Species hull** — keep the sample fixed and instead adjust the reference-mixture
+  splitting parameters so the triangle encloses it, giving a **zero-distortion**
+  exact fit. This works only when the sample lies inside the convex hull of the
+  reference species; outside that hull it is impossible and the GUI reports an error
+  suggesting a different method.
+
+When extrapolation is applied, the GUI status bar shows the composition actually
+used (C/H/O) and the distortion Δ (the (C, H) distance between the input and the
+used composition; ≈ 0 for the exact species-hull fit).
 
 ## Download & install
 
@@ -97,8 +112,11 @@ biosur = BioSUR.create(C=0.50, H=0.06, N=0.0, ASH=0.0, MOIST=0.0)
 # Biomass type: 0 = Others, 1 = Grass, 2 = Hardwood, 3 = Softwood
 biosur.set_biomass_type(2)
 
-# Optional: extrapolate samples that fall outside the reference triangle
+# Optional: extrapolate samples that fall outside the reference triangle,
+# choosing the strategy (CENTROID / NEAREST_POINT / SPECIES_HULL)
+from BioSUR.core import ExtrapolationMethod
 biosur.enable_extrapolation(True)
+biosur.set_extrapolation_method(ExtrapolationMethod.NEAREST_POINT)
 
 # Optional: characterize nitrogen as protein (PROTC/PROTH/PROTO)
 biosur.enable_N_rich_characterization(True)

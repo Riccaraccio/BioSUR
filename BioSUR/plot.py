@@ -1,5 +1,5 @@
 from BioSUR.species import REFERENCE_SPECIES
-from BioSUR.core import BioSUR
+from BioSUR.core import BioSUR, ExtrapolationMethod
 from matplotlib import pyplot as plt
 
 def create_triangle_plot(biosur: BioSUR):
@@ -87,8 +87,12 @@ def create_triangle_plot(biosur: BioSUR):
     # updates (e.g. when the extrapolation toggle changes); shown only when the
     # sample is outside the triangle and extrapolation is enabled.
     plot_elements['ax'] = ax
-    show_extrap = biosur.use_extrapolation and biosur.is_outside_triangle(
-        biosur.input_composition["C"], biosur.input_composition["H"])
+    # Species-hull extrapolation keeps the sample fixed, so there is no orange
+    # point/line to draw; only the centroid/nearest-point methods move the sample.
+    show_extrap = (biosur.use_extrapolation
+                   and biosur.extrapolation_method != ExtrapolationMethod.SPECIES_HULL
+                   and biosur.is_outside_triangle(
+                       biosur.input_composition["C"], biosur.input_composition["H"]))
     extrap_point = ax.scatter(biosur.extrapolated_composition["C"],
                               biosur.extrapolated_composition["H"],
                               color='orange', marker='x', s=100)
@@ -165,8 +169,11 @@ def update_triangle_plot(biosur: BioSUR, plot_elements):
                                                biosur.input_composition['H']]])
  
     # Update extrapolated point and line, toggling visibility to match state.
-    show_extrap = biosur.use_extrapolation and biosur.is_outside_triangle(
-        biosur.input_composition["C"], biosur.input_composition["H"])
+    # Species-hull keeps the sample fixed, so its artifacts stay hidden.
+    show_extrap = (biosur.use_extrapolation
+                   and biosur.extrapolation_method != ExtrapolationMethod.SPECIES_HULL
+                   and biosur.is_outside_triangle(
+                       biosur.input_composition["C"], biosur.input_composition["H"]))
     if show_extrap:
         plot_elements['extrap_point'].set_offsets([[biosur.extrapolated_composition["C"],
                                                     biosur.extrapolated_composition["H"]]])

@@ -124,17 +124,35 @@ class GUIBioSUR(customtkinter.CTk):
             )
             self.biosur.set_biomass_type(biomass_type)
             self.biosur.enable_extrapolation(self.input_frame.get_extrapolation())
+            self.biosur.set_extrapolation_method(self.input_frame.get_extrapolation_method())
             self.biosur.enable_N_rich_characterization(n_rich)
             self.biosur.calculate_output_composition()
 
-            # Check validity and update UI accordingly. Priority: outside-triangle
-            # error, then the high-nitrogen nudge, then success.
+            # Check validity and update UI accordingly. Priority: species-hull
+            # infeasibility, outside-triangle error, extrapolation info, the
+            # high-nitrogen nudge, then success.
             values_array = self.biosur.output_array
-            if np.any(values_array < 0):
+            if not self.biosur.extrapolation_feasible:
+                self.output_frame.set_output_color(AppConfig.COLORS["ERROR"])
+                self.message_frame.set_message(
+                    "Sample outside the reference-species hull — cannot characterize "
+                    "with this method; try a different extrapolation method.",
+                    AppConfig.COLORS["ERROR"]
+                )
+            elif np.any(values_array < 0):
                 self.output_frame.set_output_color(AppConfig.COLORS["ERROR"])
                 self.message_frame.set_message(
                     "The sample composition lies outside the characterization triangle!",
                     AppConfig.COLORS["ERROR"]
+                )
+            elif self.biosur.extrapolation_applied:
+                used = self.biosur.extrapolated_composition
+                self.output_frame.set_output_color(AppConfig.COLORS["SUCCESS"])
+                self.message_frame.set_message(
+                    f"Extrapolated · {self.input_frame.get_extrapolation_method_label()} · "
+                    f"used C={float(used['C']):.4f} H={float(used['H']):.4f} O={float(used['O']):.4f} "
+                    f"· Δ={self.biosur.extrapolation_error:.2e}",
+                    AppConfig.COLORS["WARNING"]
                 )
             elif input_composition["N"] > 0.05 and not n_rich:
                 self.output_frame.set_output_color(AppConfig.COLORS["SUCCESS"])

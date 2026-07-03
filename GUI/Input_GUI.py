@@ -1,6 +1,6 @@
 import customtkinter
-from BioSUR.core import BiomassType
-from GUI.config import AppConfig 
+from BioSUR.core import BiomassType, ExtrapolationMethod
+from GUI.config import AppConfig
 
 class InputElement(customtkinter.CTkFrame):
     """A frame containing a labeled input field with optional validation."""
@@ -175,7 +175,14 @@ class MoistureAshInputFrame(customtkinter.CTkFrame):
 
 class InputFrame(customtkinter.CTkFrame):
     """Main input frame containing all input components."""
-    
+
+    # Dropdown label -> core extrapolation method. Order sets the dropdown order.
+    EXTRAPOLATION_METHODS = {
+        "Centroid": ExtrapolationMethod.CENTROID,
+        "Nearest point": ExtrapolationMethod.NEAREST_POINT,
+        "Species hull": ExtrapolationMethod.SPECIES_HULL,
+    }
+
     def __init__(self, master: customtkinter.CTk):
         """Initialize the main input frame."""
         super().__init__(master, fg_color=AppConfig.COLORS["BACKGROUND"])
@@ -215,6 +222,27 @@ class InputFrame(customtkinter.CTkFrame):
         self.extrapolation_switch.deselect()  # default: off
         self.extrapolation_switch.grid(row=0, column=1, padx=AppConfig.PADDING, pady=AppConfig.PADDING, sticky="e")
 
+        # Extrapolation method selector: only meaningful when the switch is on, so
+        # it is disabled until the switch is toggled (see _handle_biomass_type_change).
+        self.extrapolation_method = customtkinter.CTkComboBox(
+            self.header,
+            values=list(self.EXTRAPOLATION_METHODS.keys()),
+            width=140,
+            justify="center",
+            command=self._handle_biomass_type_change,
+            fg_color=AppConfig.COLORS["INPUT_BACKGROUND"],
+            text_color=AppConfig.COLORS["PRIMARY_TEXT"],
+            button_color=AppConfig.COLORS["PRIMARY_BUTTON"],
+            button_hover_color=AppConfig.COLORS["BUTTON_HOVER"],
+            border_color=AppConfig.COLORS["INPUT_BORDER"],
+            dropdown_fg_color=AppConfig.COLORS["SECONDARY_BACKGROUND"],
+            dropdown_text_color=AppConfig.COLORS["PRIMARY_TEXT"],
+            dropdown_hover_color=AppConfig.COLORS["BUTTON_HOVER"],
+            font=AppConfig.FONTS["DEFAULT"]
+        )
+        self.extrapolation_method.set("Centroid")  # matches the core default
+        self.extrapolation_method.grid(row=0, column=2, padx=(0, AppConfig.PADDING), pady=AppConfig.PADDING, sticky="e")
+
         # N-rich toggle: enable protein (PROT) characterization from the N content.
         self.n_rich_switch = customtkinter.CTkSwitch(
             self.header,
@@ -226,7 +254,7 @@ class InputFrame(customtkinter.CTkFrame):
             font=AppConfig.FONTS["DEFAULT"]
         )
         self.n_rich_switch.deselect()  # default: off
-        self.n_rich_switch.grid(row=0, column=2, padx=(0, AppConfig.PADDING), pady=AppConfig.PADDING, sticky="e")
+        self.n_rich_switch.grid(row=0, column=3, padx=(0, AppConfig.PADDING), pady=AppConfig.PADDING, sticky="e")
 
         # Create frames container
         self.frames_container = customtkinter.CTkFrame(self, fg_color=AppConfig.COLORS["BACKGROUND"])
@@ -280,6 +308,9 @@ class InputFrame(customtkinter.CTkFrame):
         self.biomass_type.set("Hardwood")
         self.biomass_type.pack(padx=AppConfig.PADDING, pady=AppConfig.PADDING)
 
+        # Method dropdown starts disabled since the extrapolation switch defaults off.
+        self._sync_extrapolation_method_state()
+
     def get_all_values(self) -> dict:
         """Get all values from all input fields."""
         return self.elemental_composition_frame.get_values() | self.moisture_ash_frame.get_values()
@@ -301,6 +332,20 @@ class InputFrame(customtkinter.CTkFrame):
         """Get whether the extrapolation toggle is enabled."""
         return bool(self.extrapolation_switch.get())
 
+    def get_extrapolation_method(self) -> ExtrapolationMethod:
+        """Get the selected extrapolation method."""
+        return self.EXTRAPOLATION_METHODS[self.extrapolation_method.get()]
+
+    def get_extrapolation_method_label(self) -> str:
+        """Get the human-readable label of the selected extrapolation method."""
+        return self.extrapolation_method.get()
+
+    def _sync_extrapolation_method_state(self) -> None:
+        """Enable the method dropdown only when extrapolation is switched on."""
+        self.extrapolation_method.configure(
+            state="normal" if self.extrapolation_switch.get() else "disabled"
+        )
+
     def get_n_rich(self) -> bool:
         """Get whether the N-rich composition toggle is enabled."""
         return bool(self.n_rich_switch.get())
@@ -311,6 +356,7 @@ class InputFrame(customtkinter.CTkFrame):
         Accepts an optional argument so it can serve both the combobox (which
         passes the selected value) and the switch (which passes nothing).
         """
+        self._sync_extrapolation_method_state()
         parent = self.winfo_toplevel()
         if hasattr(parent, "update_window"):
             parent.update_window()

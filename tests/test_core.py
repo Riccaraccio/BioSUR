@@ -4,7 +4,7 @@ import math
 import numpy as np
 import pytest
 
-from BioSUR.core import BioSUR, BiomassType
+from BioSUR.core import BioSUR, BiomassType, ExtrapolationMethod, _nnls, _CHO_SPECIES, REFERENCE_SPECIES
 
 
 def _make(C=0.53, H=0.06, ASH=0.0, MOIST=0.0, bt=BiomassType.HARDWOOD, extra=False):
@@ -122,3 +122,63 @@ def test_excessive_nitrogen_triggers_protein_fraction_guard():
     b.set_biomass_type(BiomassType.GRASS).enable_N_rich_characterization(True)
     with pytest.raises(ValueError):
         b.calculate_output_composition()
+
+
+# --- Extrapolation methods -------------------------------------------------
+
+def _extrap(C, H, method, bt=BiomassType.HARDWOOD):
+    b = BioSUR.create(C=C, H=H)
+    b.set_biomass_type(bt)
+    b.enable_extrapolation(True)
+    b.set_extrapolation_method(method)
+    b.calculate_output_composition()
+    return b
+
+
+def test_extrapolation_method_defaults_to_centroid():
+    b = BioSUR.create(C=0.53, H=0.06)
+    assert b.extrapolation_method == ExtrapolationMethod.CENTROID
+
+
+def test_nearest_point_lands_on_triangle_and_beats_centroid():
+    C, H = 0.75, 0.11  # outside the triangle
+    near = _extrap(C, H, ExtrapolationMethod.NEAREST_POINT)
+    cent = _extrap(C, H, ExtrapolationMethod.CENTROID)
+
+    ec = near.extrapolated_composition
+    assert not near.is_outside_triangle(ec["C"], ec["H"])
+    # Nearest-point is the minimum-distortion correction.
+    assert near.extrapolation_error <= cent.extrapolation_error + 1e-12
+    assert near.extrapolation_applied and cent.extrapolation_applied
+
+
+def test_species_hull_exact_fit_inside_hull():
+    C, H = 0.70, 0.06  # outside the regression triangle but inside the species hull
+    b = _extrap(C, H, ExtrapolationMethod.SPECIES_HULL)
+    assert b.is_outside_triangle(C, H)          # would need extrapolation
+    assert b.extrapolation_feasible
+    assert b.extrapolation_error < 1e-4         # exact fit, zero distortion
+    assert np.all(b.output_array >= -1e-9)      # no spurious negatives
+
+    # The species mass fractions reproduce the input C/H (mass-weighted).
+    names = b.output_composition.dtype.names
+    frac = {k: float(b.output_composition[k]) for k in names}
+    c_hat = sum(frac[s] * float(REFERENCE_SPECIES[s]["C_frac"]) for s in _CHO_SPECIES)
+    h_hat = sum(frac[s] * float(REFERENCE_SPECIES[s]["H_frac"]) for s in _CHO_SPECIES)
+    assert math.isclose(c_hat, C, abs_tol=1e-3)
+    assert math.isclose(h_hat, H, abs_tol=1e-3)
+
+
+def test_species_hull_infeasible_outside_hull():
+    # C well above every reference species -> outside the species hull.
+    b = _extrap(0.90, 0.06, ExtrapolationMethod.SPECIES_HULL)
+    assert not b.extrapolation_feasible
+    assert b.extrapolation_error > 1e-3
+
+
+def test_nnls_reconstructs_known_mixture():
+    A = np.array([[1.0, 2.0, 0.0], [0.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
+    x_true = np.array([0.2, 0.5, 0.3])
+    x = _nnls(A, A @ x_true)
+    assert np.allclose(x, x_true, atol=1e-9)
+    assert np.all(x >= 0)

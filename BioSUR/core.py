@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 import numpy as np
-from enum import IntEnum
+from enum import IntEnum, Enum
 from BioSUR.species import ReferenceMixture, REFERENCE_SPECIES
 import math
 
@@ -9,6 +9,64 @@ class BiomassType(IntEnum):
     GRASS = 1
     HARDWOOD = 2
     SOFTWOOD = 3
+
+class ExtrapolationMethod(Enum):
+    """How to handle a sample that falls outside the reference-mixture triangle.
+
+    CENTROID       - march the sample toward the triangle centroid in fixed steps
+                     until it lands inside (historical default).
+    NEAREST_POINT  - project the sample onto the closest point of the triangle
+                     boundary (minimum distortion of C/H).
+    SPECIES_HULL   - keep the sample fixed and instead solve for a non-negative
+                     mix of the 7 reference species reproducing it exactly. Works
+                     only when the sample lies inside the reference-species hull.
+    """
+    CENTROID = 0
+    NEAREST_POINT = 1
+    SPECIES_HULL = 2
+
+
+# CHO reference species that span the characterization region (protein species are
+# excluded: they are handled separately by the N-rich path).
+_CHO_SPECIES = ('CELL', 'HCELL', 'LIGO', 'LIGH', 'LIGC', 'TANN', 'TGL')
+
+
+def _nnls(A: np.ndarray, b: np.ndarray, maxiter: int = 100) -> np.ndarray:
+    """Non-negative least squares (Lawson-Hanson active-set), numpy-only.
+
+    Returns x >= 0 minimizing ||A x - b||. Kept dependency-free so the packaged
+    application never needs scipy.
+    """
+    A = np.asarray(A, dtype=float)
+    b = np.asarray(b, dtype=float)
+    m, n = A.shape
+    x = np.zeros(n)
+    P = np.zeros(n, dtype=bool)          # passive (free) set
+    w = A.T @ (b - A @ x)                # gradient
+    tol = 1e-10
+    for _ in range(maxiter * n):
+        if P.all() or np.all(w[~P] <= tol):
+            break
+        # Bring the most promising variable into the passive set.
+        candidates = np.where(~P, w, -np.inf)
+        j = int(np.argmax(candidates))
+        P[j] = True
+        # Inner loop: solve the unconstrained LS on the passive set, drop any
+        # variable that went non-positive, repeat until all passive vars > 0.
+        while True:
+            s = np.zeros(n)
+            Ap = A[:, P]
+            s[P] = np.linalg.lstsq(Ap, b, rcond=None)[0]
+            if np.all(s[P] > tol):
+                x = s
+                break
+            # Step only as far as the first passive variable hitting zero.
+            mask = P & (s <= tol)
+            alpha = np.min(x[mask] / (x[mask] - s[mask]))
+            x = x + alpha * (s - x)
+            P[x <= tol] = False
+        w = A.T @ (b - A @ x)
+    return x
 
 @dataclass
 class BioSUR:
@@ -69,6 +127,15 @@ class BioSUR:
 
     use_extrapolation: bool = field(default=False)
     use_N_rich_characterization: bool = field(default=False)
+
+    # Which extrapolation strategy to use when the sample is outside the triangle.
+    extrapolation_method: ExtrapolationMethod = field(default=ExtrapolationMethod.CENTROID)
+
+    # Bookkeeping about the most recent calculate_output_composition() call, read
+    # by the GUI to build the status message.
+    extrapolation_applied: bool = field(default=False)   # did extrapolation kick in?
+    extrapolation_error: float = field(default=0.0)       # C/H distortion of the used comp
+    extrapolation_feasible: bool = field(default=True)    # False: SPECIES_HULL, sample beyond hull
 
     extrapolated_composition: np.ndarray = field(default_factory=lambda: np.zeros(1, dtype=[
         ('C', 'f8'),
@@ -284,20 +351,42 @@ class BioSUR:
 
         self.calculate_splitting_parameters()
         self.calculate_ratio_ref_species()
-        self.solve_linear_system()
 
-        out_comp = {"CELL": 0, "HCELL": 0, "LIGO": 0, "LIGH": 0, "LIGC": 0, "TANN": 0, "TGL": 0}
-        for species in out_comp.keys():
-            if species in self.RM1.composition:
-                out_comp[species] += self.RM1.composition[species] * self.RM1.fraction
-            if species in self.RM2.composition:
-                out_comp[species] += self.RM2.composition[species] * self.RM2.fraction
-            if species in self.RM3.composition:
-                out_comp[species] += self.RM3.composition[species] * self.RM3.fraction
+        # Reset extrapolation bookkeeping for this call (read by the GUI status bar).
+        self.extrapolation_applied = False
+        self.extrapolation_error = 0.0
+        self.extrapolation_feasible = True
 
-        avg_MW = np.sum([value * ref_species[key]['MW'] for key, value in out_comp.items()])
+        outside = self.use_extrapolation and self.is_outside_triangle(
+            self.input_composition["C"], self.input_composition["H"])
 
-        out_comp = {key: value * ref_species[key]['MW'] / avg_MW for key, value in out_comp.items()}
+        if outside and self.extrapolation_method == ExtrapolationMethod.SPECIES_HULL:
+            # Keep the sample fixed and reparametrize onto the reference-species hull;
+            # the result is already species mass fractions, so skip the RM mole->mass path.
+            out_comp = self._decompose_species_hull()
+            self.extrapolation_applied = True
+        else:
+            self.solve_linear_system()
+
+            out_comp = {"CELL": 0, "HCELL": 0, "LIGO": 0, "LIGH": 0, "LIGC": 0, "TANN": 0, "TGL": 0}
+            for species in out_comp.keys():
+                if species in self.RM1.composition:
+                    out_comp[species] += self.RM1.composition[species] * self.RM1.fraction
+                if species in self.RM2.composition:
+                    out_comp[species] += self.RM2.composition[species] * self.RM2.fraction
+                if species in self.RM3.composition:
+                    out_comp[species] += self.RM3.composition[species] * self.RM3.fraction
+
+            avg_MW = np.sum([value * ref_species[key]['MW'] for key, value in out_comp.items()])
+
+            out_comp = {key: value * ref_species[key]['MW'] / avg_MW for key, value in out_comp.items()}
+
+            if outside:
+                # CENTROID / NEAREST_POINT moved the sample; record the C/H distortion.
+                self.extrapolation_applied = True
+                self.extrapolation_error = float(np.hypot(
+                    self.input_composition["C"] - self.extrapolated_composition["C"],
+                    self.input_composition["H"] - self.extrapolated_composition["H"]))
 
         # Scale the CHO species down to make room for the protein fraction, then add
         # the protein pseudo-species (already mass fractions of the whole DAF sample).
@@ -320,6 +409,11 @@ class BioSUR:
     def enable_extrapolation(self, on:bool) -> 'BioSUR':
         """Enable or disable the extrapolation of the composition"""
         self.use_extrapolation = on
+        return self
+
+    def set_extrapolation_method(self, method: ExtrapolationMethod) -> 'BioSUR':
+        """Select the strategy used to extrapolate out-of-triangle samples."""
+        self.extrapolation_method = method
         return self
 
     def enable_N_rich_characterization(self, on: bool) -> 'BioSUR':
@@ -360,7 +454,18 @@ class BioSUR:
 
 
     def extrapolate_composition(self) -> np.ndarray:
-        """Extrapolate the composition"""
+        """Move an out-of-triangle sample onto the triangle, per the selected method.
+
+        Dispatches between the centroid march and the nearest-point projection.
+        SPECIES_HULL does not move the sample and is handled separately in
+        calculate_output_composition.
+        """
+        if self.extrapolation_method == ExtrapolationMethod.NEAREST_POINT:
+            return self._extrapolate_nearest_point()
+        return self._extrapolate_centroid()
+
+    def _extrapolate_centroid(self) -> 'BioSUR':
+        """March the sample toward the triangle centroid until it lands inside."""
         #check if the input composition in outside the triangle defined by the reference mixtures
         print("WARNING: The input composition is outside the triangle defined by the reference mixtures. Extrapolating the composition...")
 
@@ -373,7 +478,7 @@ class BioSUR:
         # Calculate the vector from the bariocenter to the input composition
         vector = np.array([self.input_composition["C"] - bariocenter[0],
                             self.input_composition["H"] - bariocenter[1]])
-        
+
         while self.is_outside_triangle(self.extrapolated_composition["C"], self.extrapolated_composition["H"]):
             # Move the input composition towards the bariocenter
             self.extrapolated_composition["C"] -= vector[0] * 0.01
@@ -381,6 +486,78 @@ class BioSUR:
             self.extrapolated_composition["O"] = 1 - self.extrapolated_composition["C"] - self.extrapolated_composition["H"]
 
         return self
+
+    def _extrapolate_nearest_point(self) -> 'BioSUR':
+        """Project the sample onto the closest point of the RM triangle boundary.
+
+        This is the minimum-distortion correction: among all representable points
+        it changes the measured (C, H) the least. Closed-form (clamped projection
+        onto each of the three edges, nearest wins).
+        """
+        self.extrapolated_composition = self.input_composition.copy()
+
+        P = np.array([self.input_composition["C"], self.input_composition["H"]])
+        V = [np.array([self.RM1.C_frac, self.RM1.H_frac]),
+             np.array([self.RM2.C_frac, self.RM2.H_frac]),
+             np.array([self.RM3.C_frac, self.RM3.H_frac])]
+
+        best = None
+        best_d2 = np.inf
+        for A, B in ((V[0], V[1]), (V[1], V[2]), (V[2], V[0])):
+            AB = B - A
+            denom = float(AB @ AB)
+            t = 0.0 if denom == 0 else float(((P - A) @ AB) / denom)
+            t = min(1.0, max(0.0, t))
+            cand = A + t * AB
+            d2 = float((P - cand) @ (P - cand))
+            if d2 < best_d2:
+                best_d2 = d2
+                best = cand
+
+        self.extrapolated_composition["C"] = best[0]
+        self.extrapolated_composition["H"] = best[1]
+        self.extrapolated_composition["O"] = 1 - best[0] - best[1]
+        return self
+
+    def _decompose_species_hull(self) -> dict:
+        """Reparametrize the sample onto the reference-species hull (SPECIES_HULL).
+
+        Instead of moving the sample, find a non-negative mix of the 7 CHO
+        reference species that reproduces its (C, H) exactly and sums to 1 --
+        equivalently, splitting parameters that make the RM triangle enclose it.
+        Among the (generally many) exact fits, the minimum-norm one is chosen via
+        a regularized NNLS. Sets extrapolation feasibility/error bookkeeping and
+        returns the species mass fractions.
+        """
+        ref_species = REFERENCE_SPECIES
+        C = float(self.input_composition["C"])
+        H = float(self.input_composition["H"])
+
+        c_row = np.array([ref_species[s]['C_frac'] for s in _CHO_SPECIES], dtype=float)
+        h_row = np.array([ref_species[s]['H_frac'] for s in _CHO_SPECIES], dtype=float)
+        ones = np.ones(len(_CHO_SPECIES))
+
+        # Large weight pins the three equality constraints; a small ridge on the
+        # identity block breaks ties toward the minimum-norm (most balanced) fit.
+        big = 1e3
+        reg = 1e-3
+        A = np.vstack([big * c_row, big * h_row, big * ones, reg * np.eye(len(_CHO_SPECIES))])
+        b = np.concatenate([[big * C, big * H, big * 1.0], np.zeros(len(_CHO_SPECIES))])
+
+        w = _nnls(A, b)
+        total = w.sum()
+        if total > 0:
+            w = w / total  # enforce exact sum-to-1
+
+        # Residual of the reproduced (C, H): ~0 inside the hull, > tol outside it.
+        residual = abs(float(w @ c_row) - C) + abs(float(w @ h_row) - H)
+        self.extrapolation_feasible = residual < 1e-4
+        self.extrapolation_error = residual
+
+        # Method 3 does not move the sample.
+        self.extrapolated_composition = self.input_composition.copy()
+
+        return {s: float(w[i]) for i, s in enumerate(_CHO_SPECIES)}
 
     def is_outside_triangle(self, C, H) -> bool:
         """Check if a point is inside the triangle defined by the reference mixtures"""
