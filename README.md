@@ -18,6 +18,7 @@ BioSUR automates the CRECK biomass characterization method: it converts a
 biomass sample's elemental analysis into the pseudo-component composition used by
 the CRECK kinetic scheme for biomass pyrolysis.
 
+For the biomass kinetic scheme see [the CRECK Modeling GitHub page](https://github.com/CRECKMODELING/Kinetic-Mechanisms/tree/main/Solid-Phase/Biomass).
 ## Input
 
 - **C**, **H** — carbon and hydrogen mass fractions on a **Dry Ash Free (DAF)**
