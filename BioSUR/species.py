@@ -9,6 +9,11 @@ class ReferenceSpecies:
         #  name      C    H    O    N    MW    C_frac  H_frac  O_frac  N_frac
         ('CELL',     6,  10,   5,   0,  162, 0.444, 0.062, 0.494, 0.0),
         ('HCELL',    5,   8,   4,   0,  133, 0.455, 0.061, 0.485, 0.0),
+        # Detailed hemicellulose species (replace HCELL when the hemicellulose
+        # split is enabled; see BioSUR.core.HEMICELLULOSE_SPLIT)
+        ('GLXY',     5,  10,   5,   0,  150, 0.400, 0.067, 0.533, 0.0),
+        ('GLMN',     6,  10,   5,   0,  162, 0.444, 0.062, 0.494, 0.0),
+        ('ARXY',     5,  10,   5,   0,  150, 0.400, 0.067, 0.533, 0.0),
         ('LIGC',    15,  14,   4,   0,  258, 0.698, 0.054, 0.248, 0.0),
         ('LIGH',    22,  28,   9,   0,  436, 0.606, 0.064, 0.330, 0.0),
         ('LIGO',    20,  22,  10,   0,  422, 0.569, 0.052, 0.379, 0.0),

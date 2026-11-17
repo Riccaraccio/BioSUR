@@ -24,7 +24,7 @@ as given):
 | Component        | Species |
 | ---------------- | ------- |
 | Cellulose        | `CELL` |
-| Hemicellulose    | `HCELL` — displayed as `XYGR` (Others/Grass), `XYHW` (Hardwood) or `GMSW` (Softwood) |
+| Hemicellulose    | `HCELL` — displayed as `XYGR` (Others/Grass), `XYHW` (Hardwood) or `GMSW` (Softwood); or `GLXY`, `GLMN`, `ARXY` with detailed hemicellulose |
 | Lignins          | `LIGO`, `LIGH`, `LIGC` |
 | Tannins          | `TANN` |
 | Triglycerides    | `TGL` |
@@ -40,6 +40,24 @@ in the API), the nitrogen content is characterized as a protein fraction split
 between the three protein species `PROTC/PROTH/PROTO`; the remaining C/H/O is then
 characterized as usual. When disabled, nitrogen is ignored (C/H/O renormalized),
 and if `N > 5%` the GUI suggests turning the option on.
+
+**Detailed hemicellulose.** When enabled (GUI switch *Detailed hemicellulose* /
+`enable_hemicellulose_split` in the API), the lumped `HCELL` is replaced by three
+species — `GLXY` (C5H10O5), `GLMN` (C6H10O5) and `ARXY` (C5H10O5) — following the
+CRECK-S-B hemicellulose characterization. The hemicellulose share of RM1,
+`1 − α`, is split on a mole basis with biomass-specific fractions:
+
+| Biomass type         | `GLXY`  | `GLMN`   | `ARXY` (remainder) |
+| -------------------- | ------- | -------- | ------------------ |
+| Hardwood             | 0.8515  | 0.09775  | 0.05075            |
+| Softwood             | 0.2512  | 0.573    | 0.1758             |
+| Grass                | 0.63    | 0.084    | 0.286              |
+| Others (uses Grass)  | 0.63    | 0.084    | 0.286              |
+
+The α…ε splitting-parameter correlations are unchanged; because RM1 moves, the
+whole characterization (not only the hemicellulose) changes, and Hardwood and
+Softwood no longer give identical results. The switch is off by default, giving
+the original lumped-`HCELL` results.
 
 **Extrapolation.** Samples whose (C, H) fall outside the triangle defined by the
 three reference mixtures can optionally be **extrapolated** (GUI switch /
@@ -107,6 +125,9 @@ biosur.set_extrapolation_method(ExtrapolationMethod.NEAREST_POINT)
 
 # Optional: characterize nitrogen as protein (PROTC/PROTH/PROTO)
 biosur.enable_N_rich_characterization(True)
+
+# Optional: detailed hemicellulose (GLXY/GLMN/ARXY instead of the lumped HCELL)
+biosur.enable_hemicellulose_split(True)
 
 biosur.calculate_output_composition()
 print(biosur.output_composition)      # structured array of the components above

@@ -30,6 +30,21 @@ class ExtrapolationMethod(Enum):
 # excluded: they are handled separately by the N-rich path).
 _CHO_SPECIES = ('CELL', 'HCELL', 'LIGO', 'LIGH', 'LIGC', 'TANN', 'TGL')
 
+# Species replacing the lumped HCELL when the detailed hemicellulose model is on.
+HEMICELLULOSE_SPECIES = ('GLXY', 'GLMN', 'ARXY')
+
+# Detailed hemicellulose model (CRECK-S-B "CharacterizationHemicell" procedure):
+# the hemicellulose share of RM1, (1 - alpha), is split on a MOLE basis into
+# (GLXY, GLMN) with these biomass-specific fractions; ARXY takes the remainder.
+# There is no dedicated fit for OTHERS: it uses the Grass split, consistent with
+# the lumped model labelling its hemicellulose as XYGR.
+HEMICELLULOSE_SPLIT = {
+    0: (0.63,   0.084),    # OTHERS   (Grass values)
+    1: (0.63,   0.084),    # GRASS
+    2: (0.8515, 0.09775),  # HARDWOOD
+    3: (0.2512, 0.573),    # SOFTWOOD
+}
+
 
 def _nnls(A: np.ndarray, b: np.ndarray, maxiter: int = 100) -> np.ndarray:
     """Non-negative least squares (Lawson-Hanson active-set), numpy-only.
@@ -84,6 +99,9 @@ class BioSUR:
     output_composition: np.ndarray = field(default_factory=lambda: np.zeros(1, dtype=[
         ('CELL', 'f8'),
         ('HCELL', 'f8'),
+        ('GLXY', 'f8'),
+        ('GLMN', 'f8'),
+        ('ARXY', 'f8'),
         ('LIGO', 'f8'),
         ('LIGH', 'f8'),
         ('LIGC', 'f8'),
@@ -127,6 +145,10 @@ class BioSUR:
 
     use_extrapolation: bool = field(default=False)
     use_N_rich_characterization: bool = field(default=False)
+
+    # Detailed hemicellulose model: split HCELL into GLXY/GLMN/ARXY (see
+    # HEMICELLULOSE_SPLIT). Off by default, i.e. the lumped HCELL model.
+    use_hemicellulose_split: bool = field(default=False)
 
     # Which extrapolation strategy to use when the sample is outside the triangle.
     extrapolation_method: ExtrapolationMethod = field(default=ExtrapolationMethod.CENTROID)
@@ -245,11 +267,11 @@ class BioSUR:
         delta = self.splitting_parameters[3]
         epsilon = self.splitting_parameters[4]
 
-        # For RM1:
-        self.RM1.mix_species({
-            'CELL': alpha,
-            'HCELL': 1-alpha
-        })
+        # For RM1: cellulose + hemicellulose (lumped HCELL or the detailed split).
+        rm1 = {'CELL': alpha}
+        for species, share in self.hemicellulose_composition().items():
+            rm1[species] = (1-alpha) * share
+        self.RM1.mix_species(rm1)
 
         # For RM2:
         self.RM2.mix_species({
@@ -368,7 +390,7 @@ class BioSUR:
         else:
             self.solve_linear_system()
 
-            out_comp = {"CELL": 0, "HCELL": 0, "LIGO": 0, "LIGH": 0, "LIGC": 0, "TANN": 0, "TGL": 0}
+            out_comp = {s: 0 for s in self._active_cho_species()}
             for species in out_comp.keys():
                 if species in self.RM1.composition:
                     out_comp[species] += self.RM1.composition[species] * self.RM1.fraction
@@ -402,9 +424,31 @@ class BioSUR:
             if key in ("ASH", "MOIST"):
                 self.output_composition[key] = self.input_composition[key]
             else:
-                self.output_composition[key] = out_comp[key] * solid_fraction
+                # Species not used by the active hemicellulose model stay at 0.
+                self.output_composition[key] = out_comp.get(key, 0.0) * solid_fraction
 
         return self
+
+    def enable_hemicellulose_split(self, on: bool) -> 'BioSUR':
+        """Enable or disable the detailed hemicellulose model.
+
+        When enabled, the lumped HCELL is replaced by GLXY/GLMN/ARXY, split
+        according to the biomass type (see HEMICELLULOSE_SPLIT).
+        """
+        self.use_hemicellulose_split = on
+        return self
+
+    def hemicellulose_composition(self) -> dict:
+        """Mole fractions of the species making up the hemicellulose of RM1."""
+        if not self.use_hemicellulose_split:
+            return {'HCELL': 1.0}
+        glxy, glmn = HEMICELLULOSE_SPLIT[int(self.biomass_type)]
+        return {'GLXY': glxy, 'GLMN': glmn, 'ARXY': 1 - glxy - glmn}
+
+    def _active_cho_species(self) -> tuple:
+        """CHO reference species used by the active hemicellulose model, in output order."""
+        hemi = HEMICELLULOSE_SPECIES if self.use_hemicellulose_split else ('HCELL',)
+        return ('CELL',) + hemi + ('LIGO', 'LIGH', 'LIGC', 'TANN', 'TGL')
     
     def enable_extrapolation(self, on:bool) -> 'BioSUR':
         """Enable or disable the extrapolation of the composition"""
@@ -533,16 +577,28 @@ class BioSUR:
         C = float(self.input_composition["C"])
         H = float(self.input_composition["H"])
 
-        c_row = np.array([ref_species[s]['C_frac'] for s in _CHO_SPECIES], dtype=float)
-        h_row = np.array([ref_species[s]['H_frac'] for s in _CHO_SPECIES], dtype=float)
-        ones = np.ones(len(_CHO_SPECIES))
+        # Each NNLS column is one CHO species, except that with the detailed
+        # hemicellulose model GLXY/GLMN/ARXY enter as a single fixed blend (their
+        # biomass-specific split), expanded back to species after the fit.
+        hemi_moles = self.hemicellulose_composition()
+        hemi_mass = {s: x * float(ref_species[s]['MW']) for s, x in hemi_moles.items()}
+        hemi_total = sum(hemi_mass.values())
+        hemi_mass = {s: m / hemi_total for s, m in hemi_mass.items()}
+        columns = [{s: 1.0} if s != 'HCELL' else hemi_mass for s in _CHO_SPECIES]
+        n = len(columns)
+
+        c_row = np.array([sum(m * float(ref_species[s]['C_frac']) for s, m in col.items())
+                          for col in columns])
+        h_row = np.array([sum(m * float(ref_species[s]['H_frac']) for s, m in col.items())
+                          for col in columns])
+        ones = np.ones(n)
 
         # Large weight pins the three equality constraints; a small ridge on the
         # identity block breaks ties toward the minimum-norm (most balanced) fit.
         big = 1e3
         reg = 1e-3
-        A = np.vstack([big * c_row, big * h_row, big * ones, reg * np.eye(len(_CHO_SPECIES))])
-        b = np.concatenate([[big * C, big * H, big * 1.0], np.zeros(len(_CHO_SPECIES))])
+        A = np.vstack([big * c_row, big * h_row, big * ones, reg * np.eye(n)])
+        b = np.concatenate([[big * C, big * H, big * 1.0], np.zeros(n)])
 
         w = _nnls(A, b)
         total = w.sum()
@@ -557,7 +613,11 @@ class BioSUR:
         # Method 3 does not move the sample.
         self.extrapolated_composition = self.input_composition.copy()
 
-        return {s: float(w[i]) for i, s in enumerate(_CHO_SPECIES)}
+        out = {}
+        for wi, col in zip(w, columns):
+            for s, m in col.items():
+                out[s] = out.get(s, 0.0) + float(wi) * m
+        return out
 
     def is_outside_triangle(self, C, H) -> bool:
         """Check if a point is inside the triangle defined by the reference mixtures"""

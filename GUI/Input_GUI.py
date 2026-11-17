@@ -256,6 +256,20 @@ class InputFrame(customtkinter.CTkFrame):
         self.n_rich_switch.deselect()  # default: off
         self.n_rich_switch.grid(row=0, column=3, padx=(0, AppConfig.PADDING), pady=AppConfig.PADDING, sticky="e")
 
+        # Detailed hemicellulose toggle: split HCELL into GLXY/GLMN/ARXY with the
+        # biomass-type-specific ratios (CRECK-S-B hemicellulose characterization).
+        self.hemicellulose_switch = customtkinter.CTkSwitch(
+            self.header,
+            text="Detailed hemicellulose",
+            command=self._handle_biomass_type_change,
+            progress_color=AppConfig.COLORS["PRIMARY_BUTTON"],
+            button_hover_color=AppConfig.COLORS["BUTTON_HOVER"],
+            text_color=AppConfig.COLORS["PRIMARY_TEXT"],
+            font=AppConfig.FONTS["DEFAULT"]
+        )
+        self.hemicellulose_switch.deselect()  # default: off (lumped HCELL)
+        self.hemicellulose_switch.grid(row=0, column=4, padx=(0, AppConfig.PADDING), pady=AppConfig.PADDING, sticky="e")
+
         # Create frames container
         self.frames_container = customtkinter.CTkFrame(self, fg_color=AppConfig.COLORS["BACKGROUND"])
         self.frames_container.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=AppConfig.PADDING, pady=AppConfig.PADDING)
@@ -349,6 +363,10 @@ class InputFrame(customtkinter.CTkFrame):
     def get_n_rich(self) -> bool:
         """Get whether the N-rich composition toggle is enabled."""
         return bool(self.n_rich_switch.get())
+
+    def get_hemicellulose_split(self) -> bool:
+        """Get whether the detailed hemicellulose (GLXY/GLMN/ARXY) toggle is enabled."""
+        return bool(self.hemicellulose_switch.get())
 
     def _handle_biomass_type_change(self, choice=None) -> None:
         """Trigger a recompute when an input control changes.

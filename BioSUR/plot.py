@@ -1,16 +1,27 @@
 import math
 
 from BioSUR.species import REFERENCE_SPECIES
-from BioSUR.core import BioSUR, ExtrapolationMethod
+from BioSUR.core import BioSUR, ExtrapolationMethod, HEMICELLULOSE_SPECIES
 from matplotlib import pyplot as plt
 
-# Reference-species -> reference-mixture connection topology. Order is preserved
-# in plot_elements['ref_species_lines'] so updates map 1:1.
-_CONNECTIONS = [
-    ('CELL', 'RM1'), ('HCELL', 'RM1'),
+# Reference-species -> reference-mixture connection topology, excluding the
+# hemicellulose species (which depend on the active hemicellulose model, see
+# _connections). Order is preserved in plot_elements['ref_species_lines'] so
+# updates map 1:1.
+_BASE_CONNECTIONS = [
     ('LIGH', 'RM2'), ('LIGC', 'RM2'), ('TGL', 'RM2'),
     ('LIGO', 'RM3'), ('LIGC', 'RM3'), ('TANN', 'RM3'),
 ]
+
+
+def _hemicellulose_species(biosur):
+    """Hemicellulose species of the active model (lumped HCELL or the split)."""
+    return HEMICELLULOSE_SPECIES if biosur.use_hemicellulose_split else ('HCELL',)
+
+
+def _connections(biosur):
+    rm1 = [('CELL', 'RM1')] + [(s, 'RM1') for s in _hemicellulose_species(biosur)]
+    return rm1 + _BASE_CONNECTIONS
 
 # Hover tooltip styling (kept local so plot.py stays independent of the GUI config).
 _HOVER_BG = '#36393F'
@@ -45,16 +56,22 @@ def _comp_xy(comp, mode):
     return _project(float(comp['C']), float(comp['H']), float(comp['O']), mode)
 
 
-def _cho_species_names():
-    """Reference-species names that span the characterization triangle (no PROT)."""
-    return [s for s in REFERENCE_SPECIES.characteristics['name'] if not s.startswith('PROT')]
+def _cho_species_names(biosur):
+    """Reference-species names spanning the characterization triangle.
+
+    Protein species are excluded, as are the hemicellulose species of the
+    inactive hemicellulose model.
+    """
+    inactive = set(HEMICELLULOSE_SPECIES + ('HCELL',)) - set(_hemicellulose_species(biosur))
+    return [s for s in REFERENCE_SPECIES.characteristics['name']
+            if not s.startswith('PROT') and s not in inactive]
 
 
 def _axis_config(mode, biosur):
     """Return (xlabel, ylabel, title, xlim, ylim) for the given mode."""
     if mode == 'vankrevelen':
         xs, ys = [], []
-        for name in _cho_species_names():
+        for name in _cho_species_names(biosur):
             x, y = _species_xy(name, mode)
             xs.append(x)
             ys.append(y)
@@ -66,8 +83,10 @@ def _axis_config(mode, biosur):
         ypad = (max(ys) - min(ys)) * 0.08 or 0.05
         return ('O/C [mol/mol]', 'H/C [mol/mol]', 'Van Krevelen diagram',
                 (min(xs) - xpad, max(xs) + xpad), (min(ys) - ypad, max(ys) + ypad))
+    # GLXY/ARXY (C = 0.40) sit left of the historical window: widen it when shown.
+    xmin = 0.38 if biosur.use_hemicellulose_split else 0.43
     return ('C fraction [-]', 'H fraction [-]', 'Characterization triangle (C/H fractions)',
-            (0.43, 0.77), (0.02, 0.12))
+            (xmin, 0.77), (0.02, 0.12))
 
 
 def _extrap_shown(biosur):
@@ -96,7 +115,8 @@ def _draw_all(ax, biosur: BioSUR, mode: str) -> dict:
     ax.grid(True, which='both', linestyle='--', linewidth=0.5)
     ax.set_title(title)
 
-    plot_elements = {'ax': ax, 'mode': mode}
+    plot_elements = {'ax': ax, 'mode': mode,
+                     'hemicellulose_split': biosur.use_hemicellulose_split}
 
     p1, p2, p3 = (_rm_xy(biosur.RM1, mode), _rm_xy(biosur.RM2, mode), _rm_xy(biosur.RM3, mode))
 
@@ -112,7 +132,7 @@ def _draw_all(ax, biosur: BioSUR, mode: str) -> dict:
         label="Reference Mixtures", color='blue', marker='o', s=100)
 
     # Reference species (static; protein species excluded). Names kept in order for hover.
-    cho_species = _cho_species_names()
+    cho_species = _cho_species_names(biosur)
     sp_xy = [_species_xy(s, mode) for s in cho_species]
     plot_elements['ref_species_points'] = ax.scatter(
         [xy[0] for xy in sp_xy], [xy[1] for xy in sp_xy],
@@ -122,7 +142,7 @@ def _draw_all(ax, biosur: BioSUR, mode: str) -> dict:
     # Species <-> reference-mixture connection lines.
     rm_map = {'RM1': biosur.RM1, 'RM2': biosur.RM2, 'RM3': biosur.RM3}
     ref_lines = []
-    for sp, rm in _CONNECTIONS:
+    for sp, rm in _connections(biosur):
         sx, sy = _species_xy(sp, mode)
         rx, ry = _rm_xy(rm_map[rm], mode)
         line, = ax.plot([sx, rx], [sy, ry], color='black', linewidth=0.5)
@@ -188,7 +208,8 @@ def handle_hover(event, plot_elements) -> bool:
         idxs = list(info['ind'])
         offsets = scatter.get_offsets()
         pos = offsets[idxs[0]]
-        # Join overlapping points (e.g. CELL/HCELL nearly coincide), keep order/uniqueness.
+        # Join overlapping points (e.g. CELL/HCELL nearly coincide, CELL/GLMN and
+        # GLXY/ARXY coincide exactly), keep order/uniqueness.
         label = " / ".join(dict.fromkeys(names[i] for i in idxs))
         ann.xy = (float(pos[0]), float(pos[1]))
         ann.set_text(label)
@@ -213,6 +234,16 @@ def update_triangle_plot(biosur: BioSUR, plot_elements):
     """Update the dynamic elements of the plot in its current coordinate mode."""
     mode = plot_elements.get('mode', 'fraction')
 
+    # Switching the hemicellulose model changes which species (and connection
+    # lines) exist, so rebuild the plot in place instead of updating it.
+    if plot_elements.get('hemicellulose_split') != biosur.use_hemicellulose_split:
+        ax = plot_elements['ax']
+        ax.clear()
+        new_elements = _draw_all(ax, biosur, mode)
+        plot_elements.clear()
+        plot_elements.update(new_elements)
+        return
+
     p1, p2, p3 = (_rm_xy(biosur.RM1, mode), _rm_xy(biosur.RM2, mode), _rm_xy(biosur.RM3, mode))
 
     # Triangle lines.
@@ -226,7 +257,7 @@ def update_triangle_plot(biosur: BioSUR, plot_elements):
 
     # Connection lines.
     rm_map = {'RM1': biosur.RM1, 'RM2': biosur.RM2, 'RM3': biosur.RM3}
-    for line, (sp, rm) in zip(plot_elements['ref_species_lines'], _CONNECTIONS):
+    for line, (sp, rm) in zip(plot_elements['ref_species_lines'], _connections(biosur)):
         sx, sy = _species_xy(sp, mode)
         rx, ry = _rm_xy(rm_map[rm], mode)
         line.set_data([sx, rx], [sy, ry])

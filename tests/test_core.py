@@ -182,3 +182,83 @@ def test_nnls_reconstructs_known_mixture():
     x = _nnls(A, A @ x_true)
     assert np.allclose(x, x_true, atol=1e-9)
     assert np.all(x >= 0)
+
+
+# --- Detailed hemicellulose model (GLXY / GLMN / ARXY) ----------------------
+
+# Reference results from "CRECK-S-B CharacterizationHemicell.xlsx" (wet+ash mass
+# fractions, row 81). Order: CELL, GLXY, GLMN, ARXY, LIGO, LIGH, LIGC, TANN, TGL.
+_HEMI_ORDER = ('CELL', 'GLXY', 'GLMN', 'ARXY', 'LIGO', 'LIGH', 'LIGC', 'TANN', 'TGL')
+_HEMI_EXCEL = [
+    # Hardwood sheet (sample outside the triangle: negative LIGH/TGL are expected)
+    (BiomassType.HARDWOOD, 0.4712770216172939, 0.05894715772618095, 0.0224, 0.0132,
+     [0.4755299855946912, 0.1832630961357948, 0.022721180339466657, 0.010922609663994769,
+      0.21548939635244924, -0.0030968157260027602, 0.0, 0.06289708840644251,
+      -0.003326540766836269]),
+    (BiomassType.SOFTWOOD, 0.505, 0.059, 0.006, 0.0,
+     [0.4060827528987244, 0.04658378495014433, 0.11476078614071382, 0.03260123166494971,
+      0.20848073174619952, 0.029769883689078958, 0.06499505648476389, 0.07232199669913833,
+      0.018403775726286913]),
+    (BiomassType.GRASS, 0.505, 0.059, 0.006, 0.0,
+     [0.32179378662583186, 0.14947219057868666, 0.021523995443330876, 0.06785562937381648,
+      0.23374663221710196, 0.0014464165793608935, 0.06398057606225145, 0.10759301719458055,
+      0.02658775592503927]),
+]
+
+
+def _hemi(C=0.53, H=0.06, ASH=0.0, MOIST=0.0, bt=BiomassType.HARDWOOD, on=True):
+    b = BioSUR.create(C=C, H=H, ASH=ASH, MOIST=MOIST)
+    b.set_biomass_type(bt).enable_hemicellulose_split(on)
+    b.calculate_output_composition()
+    return b
+
+
+def test_hemicellulose_split_defaults_off():
+    b = _make()
+    assert not b.use_hemicellulose_split
+    o = _out(b)
+    assert o["HCELL"] > 0
+    assert o["GLXY"] == o["GLMN"] == o["ARXY"] == 0.0
+
+
+@pytest.mark.parametrize("bt,C,H,ASH,MOIST,expected", _HEMI_EXCEL,
+                         ids=lambda v: v.name if isinstance(v, BiomassType) else None)
+def test_hemicellulose_split_matches_excel(bt, C, H, ASH, MOIST, expected):
+    o = _out(_hemi(C=C, H=H, ASH=ASH, MOIST=MOIST, bt=bt))
+    assert o["HCELL"] == 0.0
+    for name, exp in zip(_HEMI_ORDER, expected):
+        assert math.isclose(o[name], exp, abs_tol=1e-12), name
+    assert math.isclose(o["ASH"], ASH) and math.isclose(o["MOIST"], MOIST)
+
+
+@pytest.mark.parametrize("bt", list(BiomassType))
+def test_hemicellulose_split_mole_ratios_follow_biomass_type(bt):
+    """GLXY/GLMN/ARXY keep the biomass-specific mole split of HEMICELLULOSE_SPLIT."""
+    from BioSUR.core import HEMICELLULOSE_SPLIT
+    o = _out(_hemi(C=0.50, H=0.06, bt=bt))
+    moles = {s: o[s] / float(REFERENCE_SPECIES[s]["MW"]) for s in ("GLXY", "GLMN", "ARXY")}
+    total = sum(moles.values())
+    glxy, glmn = HEMICELLULOSE_SPLIT[int(bt)]
+    assert math.isclose(moles["GLXY"] / total, glxy, rel_tol=1e-9)
+    assert math.isclose(moles["GLMN"] / total, glmn, rel_tol=1e-9)
+
+
+def test_hemicellulose_split_mass_balance():
+    b = _hemi(C=0.50, H=0.06, ASH=0.05, MOIST=0.10, bt=BiomassType.SOFTWOOD)
+    o = _out(b)
+    organics = sum(v for k, v in o.items() if k not in ("ASH", "MOIST"))
+    assert math.isclose(organics, 1 - 0.05 - 0.10, rel_tol=1e-9, abs_tol=1e-9)
+
+
+def test_hemicellulose_split_species_hull_keeps_blend():
+    C, H = 0.70, 0.06
+    b = BioSUR.create(C=C, H=H).set_biomass_type(BiomassType.HARDWOOD)
+    b.enable_hemicellulose_split(True).enable_extrapolation(True)
+    b.set_extrapolation_method(ExtrapolationMethod.SPECIES_HULL)
+    b.calculate_output_composition()
+    assert b.extrapolation_feasible and b.extrapolation_error < 1e-4
+    o = _out(b)
+    assert o["HCELL"] == 0.0
+    assert all(v >= -1e-9 for v in o.values())
+    c_hat = sum(o[s] * float(REFERENCE_SPECIES[s]["C_frac"]) for s in _HEMI_ORDER)
+    assert math.isclose(c_hat, C, abs_tol=1e-3)

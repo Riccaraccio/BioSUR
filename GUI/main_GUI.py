@@ -126,6 +126,7 @@ class GUIBioSUR(customtkinter.CTk):
             self.biosur.enable_extrapolation(self.input_frame.get_extrapolation())
             self.biosur.set_extrapolation_method(self.input_frame.get_extrapolation_method())
             self.biosur.enable_N_rich_characterization(n_rich)
+            self.biosur.enable_hemicellulose_split(self.input_frame.get_hemicellulose_split())
             self.biosur.calculate_output_composition()
 
             # Check validity and update UI accordingly. Priority: species-hull
@@ -167,7 +168,8 @@ class GUIBioSUR(customtkinter.CTk):
             # Update output and plot
             self.output_frame.print_output_composition(
                 self.biosur.output_composition,
-                self.biosur.biomass_type
+                self.biosur.biomass_type,
+                self.biosur.use_hemicellulose_split
             )
             self.plot_frame.update_plot()
 

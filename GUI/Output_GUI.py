@@ -1,6 +1,6 @@
 import customtkinter
 from GUI.config import AppConfig
-from BioSUR.core import BiomassType
+from BioSUR.core import BiomassType, HEMICELLULOSE_SPECIES
 
 class OutputFrame(customtkinter.CTkFrame):
     """Frame for displaying output composition."""
@@ -59,11 +59,15 @@ class OutputFrame(customtkinter.CTkFrame):
     BASE_ROWS = 9
     ROW_HEIGHT = 18
 
-    def print_output_composition(self, output_composition, biomass_type) -> None:
+    def print_output_composition(self, output_composition, biomass_type,
+                                 hemicellulose_split: bool = False) -> None:
         """Print the output composition to the output text box.
 
-        Accepts either the structured-array composition or a plain dict.
+        Accepts either the structured-array composition or a plain dict. Only the
+        hemicellulose species of the active model are shown: the lumped HCELL, or
+        GLXY/GLMN/ARXY when hemicellulose_split is on.
         """
+        hidden = ({"HCELL"} if hemicellulose_split else set(HEMICELLULOSE_SPECIES))
         self.output_text.configure(state="normal")
         # Clear previous content
         self.output_text.delete("0.0", "end")
@@ -80,6 +84,8 @@ class OutputFrame(customtkinter.CTkFrame):
             # Protein species are only relevant for N-rich samples; hide them when
             # they are zero to keep the panel uncluttered for normal biomass.
             if key.startswith("PROT") and value == 0:
+                continue
+            if key in hidden:
                 continue
 
             # Change key depending on biomass type
